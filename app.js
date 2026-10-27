@@ -55,8 +55,8 @@ function renderForecast(){
  const date=state.forecastKind==="stock"?forecast?.stock_target_date:forecast?.crypto_target_date;
  document.getElementById("forecast-date").textContent=date?formatDate(date):"Awaiting forecast";
  const record=forecast?.track_record?.[state.forecastKind]||{};
- document.getElementById("forecast-win-rate").textContent=Number.isFinite(Number(record.positive_return_pct))?Number(record.positive_return_pct).toFixed(0)+"%":"—";
- document.getElementById("forecast-avg-return").textContent=Number.isFinite(Number(record.average_return_pct))?(Number(record.average_return_pct)>0?"+":"")+Number(record.average_return_pct).toFixed(2)+"%":"—";
+ document.getElementById("forecast-win-rate").textContent=record.positive_return_pct!==null&&record.positive_return_pct!==undefined&&Number.isFinite(Number(record.positive_return_pct))?Number(record.positive_return_pct).toFixed(0)+"%":"—";
+ document.getElementById("forecast-avg-return").textContent=record.average_return_pct!==null&&record.average_return_pct!==undefined&&Number.isFinite(Number(record.average_return_pct))?(Number(record.average_return_pct)>0?"+":"")+Number(record.average_return_pct).toFixed(2)+"%":"—";
  document.getElementById("forecast-evaluated").textContent=String(record.evaluated||0);
  document.querySelectorAll(".forecast-tab").forEach(tab=>{const active=tab.dataset.forecastKind===state.forecastKind;tab.classList.toggle("active",active);tab.setAttribute("aria-selected",String(active));});
  const rows=forecast?.[state.forecastKind==="stock"?"stocks":"crypto"]||[];
