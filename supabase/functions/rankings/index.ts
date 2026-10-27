@@ -151,11 +151,11 @@ async function predictionsFor(rows: Array<Record<string, any>>, marketDate: stri
   const targetDates = [...new Set([stockTarget, cryptoTarget])];
   const forecastUrl = new URL(predictionsUrl);
   forecastUrl.searchParams.set("target_date", "in.(" + targetDates.join(",") + ")");
-  forecastUrl.searchParams.set("select", "target_date,asset_type,symbol,name,rank,score,snapshot_price,source_market_date,source_generated_at,method_version,forecasted_at,result_close,result_return_pct,evaluated_at");
+  forecastUrl.searchParams.set("select", "target_date,asset_type,asset_id,symbol,name,rank,score,snapshot_price,source_market_date,source_generated_at,method_version,forecasted_at,result_close,result_return_pct,result_5d_close,result_5d_return_pct,result_20d_close,result_20d_return_pct,benchmark_symbol,benchmark_1d_return_pct,benchmark_5d_return_pct,benchmark_20d_return_pct,excess_1d_return_pct,excess_5d_return_pct,excess_20d_return_pct,evaluated_at");
   forecastUrl.searchParams.set("order", "asset_type.asc,rank.asc");
   const forecastResponse = await fetch(forecastUrl, { headers: baseHeaders });
   if (!forecastResponse.ok) return null;
-  const forecasts = await forecastResponse.json() as Array<Record<string, any>>;
+  const forecasts = await forecastResponse.json() as Array<Record<string, any>>;\n  for (const forecast of forecasts) forecast.news_context = rows.find((row) => row.asset_id === forecast.asset_id)?.news_context || [];
 
   const historyUrl = new URL(predictionsUrl);
   historyUrl.searchParams.set("target_date", `lte.${marketDate}`);
@@ -176,7 +176,7 @@ async function predictionsFor(rows: Array<Record<string, any>>, marketDate: stri
     for (const [label, field, excessField] of [["1d","result_return_pct","excess_1d_return_pct"],["5d","result_5d_return_pct","excess_5d_return_pct"],["20d","result_20d_return_pct","excess_20d_return_pct"]]) {
       const selected = evaluated.filter((item) => item.asset_type === assetType && item[field] !== null && item[field] !== undefined);
       const values = selected.map((item) => Number(item[field])).filter(Number.isFinite);
-      const excess = selected.map((item) => Number(item[excessField])).filter(Number.isFinite);
+      const excess = selected.map((item) => item[excessField]).filter((value) => value !== null && value !== undefined).map(Number).filter(Number.isFinite);
       horizons[label] = {
         evaluated: values.length,
         positive_return_pct: values.length ? values.filter((value) => value > 0).length / values.length * 100 : null,
