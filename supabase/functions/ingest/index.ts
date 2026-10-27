@@ -538,6 +538,8 @@ async function ingestAlphaVantage(source: Source, includeHistory = true) {
     }))
     .filter((m) => /^[A-Z][A-Z0-9.-]{0,9}$/.test(m.symbol)
       && !/[./-](W|WS|WT|U|R|P)$/i.test(m.symbol)
+      && !(m.symbol.length >= 4 && /W{1,2}$/i.test(m.symbol))
+      && !/[+]/.test(m.symbol)
       && !/\b(etf|warrant|preferred)\b/i.test(m.category)
       && m.price >= 5 && m.volume >= 1_000_000 && m.changePct > 0)
     .sort((a, b) => (b.price * b.volume) - (a.price * a.volume));

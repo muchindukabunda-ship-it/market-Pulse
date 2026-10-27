@@ -155,4 +155,3 @@ begin
   return inserted_count;
 end;
 $function$;
-
