@@ -19,10 +19,10 @@
 <a class="brand" href="/" aria-label="Market Pulse"><span class="brand-mark"><i></i><i></i><i></i></span><span>market<span>pulse</span></span></a>
 <div class="side-caption">WORKSPACE</div>
 <nav class="side-nav" aria-label="Dashboard sections">
-<a class="nav-link active" href="#overview"><span class="nav-icon">◈</span>Overview</a>
-<button class="nav-link" type="button" data-kind="stock"><span class="nav-icon">▥</span>Equities <span id="side-stock-count" class="nav-count">—</span></button>
-<button class="nav-link" type="button" data-kind="crypto"><span class="nav-icon">◉</span>Digital assets <span id="side-crypto-count" class="nav-count">—</span></button>
-<a class="nav-link" href="#allocation"><span class="nav-icon">◌</span>Allocation lab</a>
+<a class="nav-link active" href="#overview"><span class="nav-icon">⌂</span>Dashboard</a>
+<button class="nav-link" type="button" data-kind="stock"><span class="nav-icon">▥</span>Stocks <span id="side-stock-count" class="nav-count">—</span></button>
+<button class="nav-link" type="button" data-kind="crypto"><span class="nav-icon">◉</span>Crypto <span id="side-crypto-count" class="nav-count">—</span></button>
+<a class="nav-link" href="#tomorrow-forecast"><span class="nav-icon">☆</span>Forecasts</a><a class="nav-link" href="#markets"><span class="nav-icon">⌕</span>Research</a><a class="nav-link" href="#sources"><span class="nav-icon">▤</span>Sources</a><a class="nav-link" href="#allocation"><span class="nav-icon">◌</span>Allocation lab</a>
 </nav>
 <div class="sidebar-bottom">
 <div class="secure-card"><span class="secure-dot"></span><div><strong>Personal workspace</strong><span>Protected dashboard</span></div></div>
@@ -34,17 +34,12 @@
 <div class="crumb"><span class="crumb-home">MP</span><span>/</span><span>Intelligence terminal</span></div>
 <div class="top-actions"><div class="live-chip"><span class="live-dot"></span><span>LIVE + LAST REFRESHED</span></div><button id="refresh" class="refresh-btn" type="button"><span class="refresh-icon">↻</span><span>Refresh</span></button><div class="avatar">MP</div></div>
 </header>
+<section class="market-ticker" aria-label="Current ranked market signals"><span class="ticker-label">MARKET TAPE</span><div id="market-ticker-items" class="ticker-items"><span>Loading verified market snapshots…</span></div></section>
 <section class="welcome-row">
-<div><div class="eyebrow"><span class="eyebrow-mark"></span> PERSONAL MARKET INTELLIGENCE <span class="eyebrow-sep">/</span><span id="market-date">LOADING</span></div><h1>See the signal.<br><span>Size the scenario.</span></h1><p class="welcome-copy">Momentum, liquidity, and daily market movement in one decision workspace.</p></div>
+<div><div class="eyebrow"><span class="eyebrow-mark"></span> PERSONAL MARKET INTELLIGENCE <span class="eyebrow-sep">/</span><span id="market-date">LOADING</span></div><h1>Good market read.<br><span>Clearer next move.</span></h1><p class="welcome-copy">Your daily markets, verified evidence, and tomorrow’s research watchlist.</p></div>
 <div class="scan-summary"><span class="summary-label">LATEST RANKING</span><strong id="scan-time">Loading…</strong><span id="scan-status" class="scan-status"><i class="live-dot"></i>Connecting to data</span></div>
 </section>
-<section class="metric-grid" aria-label="Market overview">
-<article class="metric-card"><div class="metric-top"><span>STOCK SIGNALS</span><span class="metric-icon">▥</span></div><div class="metric-value" id="stock-count">—</div><div class="metric-sub"><span class="metric-mark green"></span><span>qualifying today</span></div></article>
-<article class="metric-card"><div class="metric-top"><span>CRYPTO SIGNALS</span><span class="metric-icon">◉</span></div><div class="metric-value" id="crypto-count">—</div><div class="metric-sub"><span class="metric-mark green"></span><span>qualifying today</span></div></article>
-<article class="metric-card"><div class="metric-top"><span>AVG SIGNAL SCORE</span><span class="metric-icon">◌</span></div><div class="metric-value"><span id="avg-score">—</span><small>/100</small></div><div class="metric-sub"><span class="metric-mark aqua"></span><span>across current board</span></div></article>
-<article class="metric-card"><div class="metric-top"><span>BOARD TURNOVER</span><span class="metric-icon">$</span></div><div class="metric-value" id="board-turnover">—</div><div class="metric-sub"><span class="metric-mark aqua"></span><span>approx. traded value</span></div></article>
-</section>
-<section class="panel data-health-panel"><div class="panel-heading"><div><div class="eyebrow small">SOURCE QUALITY</div><h2>Evidence & feed health</h2><p class="panel-subtitle">Freshness and coverage, not just a green “live” badge.</p></div><span id="health-status" class="health-status">Checking feeds…</span></div><div class="data-health-grid"><div><strong id="health-fresh">—</strong><span>fresh source feeds</span></div><div><strong id="health-history">—</strong><span>candidates with 20+ history bars</span></div><div><strong id="health-news">—</strong><span>verified linked articles</span></div></div><details class="source-health-details"><summary>Inspect source freshness</summary><div id="source-health-list" class="source-health-list"></div></details></section>
+<section class="metric-grid legacy-metrics" aria-hidden="true"><article><span id="stock-count">—</span></article><article><span id="crypto-count">—</span></article><article><span id="avg-score">—</span><span id="board-turnover">—</span></article></section>
 <section class="insights-grid">
 <article class="panel gauge-panel">
 <div class="panel-heading"><div><div class="eyebrow small">MODEL READOUT</div><h2>Signal temperature</h2></div><span class="panel-kicker">COMPOSITE SCORE</span></div>
@@ -58,6 +53,8 @@
 <div class="chart-foot"><span>Sorted by today’s percentage move</span><span>Not a historical performance chart</span></div>
 </article>
 </section>
+<section class="dashboard-trio" id="sources" aria-label="Market leaders and evidence"><article class="panel leader-panel"><div class="panel-heading"><div><div class="eyebrow small">EQUITIES</div><h2>Top stocks by attention</h2></div><button class="text-link" type="button" data-kind="stock">View all →</button></div><div class="mini-board-head"><span># / TICKER</span><span>PRICE</span><span>24H</span><span>ATTENTION</span></div><div id="top-stock-list" class="mini-board-list"><span class="loading-row">Loading equity snapshots…</span></div></article><article class="panel leader-panel"><div class="panel-heading"><div><div class="eyebrow small">DIGITAL ASSETS</div><h2>Top crypto by attention</h2></div><button class="text-link" type="button" data-kind="crypto">View all →</button></div><div class="mini-board-head"><span># / TICKER</span><span>PRICE</span><span>24H</span><span>ATTENTION</span></div><div id="top-crypto-list" class="mini-board-list"><span class="loading-row">Loading crypto snapshots…</span></div></article><article class="panel evidence-panel"><div class="panel-heading"><div><div class="eyebrow small">SOURCE QUALITY</div><h2>Source health & evidence</h2></div><a class="text-link" href="#research">View all →</a></div><div class="evidence-health"><strong id="health-fresh">—</strong><span>fresh feeds</span><strong id="health-history">—</strong><span>candidates with history</span><strong id="health-news">—</strong><span>linked articles</span></div><span id="health-status" class="health-status">Checking feeds…</span><details class="source-health-details"><summary>Inspect tracked sources</summary><div id="source-health-list" class="source-health-list"></div></details></article></section>
+<section class="panel data-health-panel legacy-health" aria-hidden="true"></section>
 <section class="workspace-grid">
 <article class="panel board-panel" id="markets">
 <div class="panel-heading board-heading"><div><div class="eyebrow small">RANKED OPPORTUNITY BOARD</div><h2 id="board-title">Equity signals</h2><p class="panel-subtitle">Ranked by the current momentum + liquidity model</p></div><div class="market-switch" role="tablist" aria-label="Select asset market"><button class="market-tab active" type="button" data-kind="stock" role="tab" aria-selected="true">Equities <span id="stock-tab-count">—</span></button><button class="market-tab" type="button" data-kind="crypto" role="tab" aria-selected="false">Crypto <span id="crypto-tab-count">—</span></button></div></div>
