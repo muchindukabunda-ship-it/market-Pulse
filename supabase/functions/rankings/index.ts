@@ -134,6 +134,7 @@ async function predictionsFor(rows: Array<Record<string, any>>, marketDate: stri
   } catch {
     evaluated = [];
   }
+  const savedForecastAt = forecasts.map((item) => String(item.forecasted_at || "")).filter(Boolean).sort()[0] || new Date().toISOString();
   const trackRecord: Record<string, { evaluated: number; positive_return_pct: number | null; average_return_pct: number | null }> = {};
   for (const assetType of ["stock", "crypto"]) {
     const outcomes = evaluated.filter((item) => item.asset_type === assetType)
@@ -147,7 +148,7 @@ async function predictionsFor(rows: Array<Record<string, any>>, marketDate: stri
   return {
     stock_target_date: stockTarget,
     crypto_target_date: cryptoTarget,
-    forecasted_at: new Date().toISOString(),
+    forecasted_at: savedForecastAt,
     method: "momentum-liquidity-v1",
     performance_note: "Historical next-session returns; descriptive only, not a validated or self-training model.",
     stocks: forecasts.filter((item) => item.asset_type === "stock"),
