@@ -229,13 +229,14 @@ function classifyHeadline(title: string, snippet: string) {
 
 function hasStrongEntityEvidence(row: Record<string, any>, mention: Record<string, any>, article: Record<string, any>) {
   if (mention.match_type === "crypto_alias") return true;
-  const text = (String(article.title || "") + " " + String(article.summary_snippet || "")).toLowerCase();
-  const symbol = String(row.symbol || "").replace(/[.*+?^${}()|[\]\\]/g, "\\Deno.serve(async (req: Request) => {");
-  const tickerContext = new RegExp(`(?:\\$\\s*${symbol}\\b|\\b${symbol}\\s+(?:shares|stock|price|ticker|rose|fell|gained|lost)\\b|\\b(?:shares|stock|ticker|price)\\s+(?:of|for|in)?\\s*${symbol}\\b|\\b(?:nasdaq|nyse|nasdaq:|nyse:)\\s*${symbol}\\b)`, "i");
-  if (tickerContext.test(String(article.title || "") + " " + String(article.summary_snippet || ""))) return true;
+  const body = String(article.title || "") + " " + String(article.summary_snippet || "");
+  const text = body.toLowerCase();
+  const symbol = String(row.symbol || "").replace(/[^A-Z0-9]/gi, "");
+  const tickerPattern = "(?:\\$\\s*" + symbol + "\\b|\\b" + symbol + "\\s+(?:shares|stock|price|ticker|rose|fell|gained|lost)\\b|\\b(?:shares|stock|ticker|price)\\s+(?:of|for|in)?\\s*" + symbol + "\\b|\\b(?:nasdaq|nyse)\\s*:?[\\s]*" + symbol + "\\b)";
+  if (new RegExp(tickerPattern, "i").test(body)) return true;
   const excluded = new Set(["inc","incorporated","corp","corporation","company","co","ltd","limited","plc","holdings","group","the","and","of","class"]);
   const terms = String(row.name || "").toLowerCase().split(/[^a-z0-9]+/).filter((word: string) => word.length >= 4 && !excluded.has(word));
-  return terms.length > 0 && terms.some((word: string) => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\]\\]/g, "\\Deno.serve(async (req: Request) => {")}\\b`, "i").test(text));
+  return terms.length > 0 && terms.some((word: string) => new RegExp("\\b" + word + "\\b", "i").test(text));
 }
 
 async function buildResearchContext(rows: Array<Record<string, any>>) {
