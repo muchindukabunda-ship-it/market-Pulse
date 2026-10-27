@@ -63,10 +63,14 @@ module.exports = async function handler(req, res) {
           .filter((item) => Number.isFinite(Number(item.price)) && Number(item.price) > 0)
           .sort((a, b) => new Date(b.time || b.timestamp || 0).getTime() - new Date(a.time || a.timestamp || 0).getTime())[0];
         if (trade) {
-          currentPrice = Number(trade.price);
-          quoteTime = trade.time || trade.timestamp || refreshedAt;
-          live = true;
-          quoteMode = "Coinbase latest trade";
+          const tradeTime = new Date(trade.time || trade.timestamp || 0);
+          const tradeAgeSeconds = (now.getTime() - tradeTime.getTime()) / 1000;
+          if (Number.isFinite(tradeAgeSeconds) && tradeAgeSeconds >= -30 && tradeAgeSeconds <= 120) {
+            currentPrice = Number(trade.price);
+            quoteTime = tradeTime.toISOString();
+            live = true;
+            quoteMode = "Coinbase latest trade";
+          }
         }
       }
 
