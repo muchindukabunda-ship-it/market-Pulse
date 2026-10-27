@@ -381,6 +381,66 @@ async function ingestKraken(source: Source) {
 }
 
 
+async function ingestCoinbasePublicHistory(source: Source) {
+  const today = new Date().toISOString().slice(0, 10);
+  const board = await db("daily_rankings?market_date=eq." + today + "&asset_type=eq.crypto&order=rank.asc&select=symbol&limit=10");
+  const symbols = [...new Set([
+    ...board.map((row: { symbol: string }) => String(row.symbol).toUpperCase()),
+    "BTC",
+    "ETH",
+  ])].filter((symbol) => /^[A-Z0-9]{2,12}$/.test(symbol)).slice(0, 12);
+  await upsertAssets(symbols.map((symbol) => ({
+    asset_type: "crypto", symbol, name: symbol, provider_symbol: symbol, aliases: [], active: true,
+  })));
+  const assets = await db("asset_instruments?asset_type=eq.crypto&symbol=in.(" + symbols.map(encodeURIComponent).join(",") + ")&select=id,symbol");
+  const idBySymbol = new Map(assets.map((a: { id: string; symbol: string }) => [a.symbol, a.id]));
+  const end = Math.floor(Date.now() / 1000);
+  const start = end - 350 * 86400;
+  const observedAt = new Date().toISOString();
+  const historyRows: Array<Record<string, unknown>> = [];
+  const collected: string[] = [];
+  const failures: string[] = [];
+  for (let i = 0; i < symbols.length; i++) {
+    const symbol = symbols[i];
+    const asset_id = idBySymbol.get(symbol);
+    if (!asset_id) { failures.push(symbol); continue; }
+    if (i > 0) await new Promise((resolve) => setTimeout(resolve, 1050));
+    try {
+      const product = encodeURIComponent(symbol + "-USD");
+      const url = "https://api.coinbase.com/api/v3/brokerage/market/products/" + product +
+        "/candles?start=" + start + "&end=" + end + "&granularity=ONE_DAY&limit=350";
+      const res = await request(url, { headers: { Accept: "application/json" } }, 9000);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const payload = await res.json();
+      if (payload.error || !Array.isArray(payload.candles)) throw new Error(String(payload.error ?? "candles missing"));
+      let added = 0;
+      for (const candle of payload.candles as Array<Record<string, unknown>>) {
+        const seconds = num(candle.start);
+        const close = num(candle.close);
+        if (seconds === null || close === null || close <= 0) continue;
+        const marketDate = new Date(seconds * 1000).toISOString().slice(0, 10);
+        if (marketDate >= today) continue;
+        historyRows.push({
+          asset_id, source_id: source.id, market_date: marketDate, observed_at: observedAt,
+          interval: "coinbase_1d_350", currency: "USD",
+          open: num(candle.open), high: num(candle.high), low: num(candle.low), close,
+          volume: num(candle.volume),
+          raw_metadata: { provider: "Coinbase public market data", product_id: symbol + "-USD" },
+        });
+        added++;
+      }
+      if (added) collected.push(symbol);
+      else failures.push(symbol);
+    } catch {
+      failures.push(symbol);
+    }
+  }
+  for (let offset = 0; offset < historyRows.length; offset += 250) {
+    await upsert("daily_prices", historyRows.slice(offset, offset + 250), "asset_id,source_id,market_date,interval");
+  }
+  return { count: historyRows.length, symbols: collected, failures };
+}
+
 async function ingestAlphaVantageHistory(
   source: Source,
   symbols: string[],
@@ -530,7 +590,7 @@ Deno.serve(async (req) => {
       const today = new Date().toISOString().slice(0, 10);
       const lastAttemptDate = source.last_attempted_at?.slice(0, 10);
       const lastSuccessDate = source.last_successful_at?.slice(0, 10);
-      const onceDaily = ["sec_company_tickers", "alpha_vantage_us_movers", "kraken_usd_markets"].includes(source.source_key);
+      const onceDaily = ["sec_company_tickers", "alpha_vantage_us_movers", "kraken_usd_markets", "coinbase_public_crypto"].includes(source.source_key);
       if (onceDaily && (source.source_key === "alpha_vantage_us_movers" ? lastAttemptDate === today : lastSuccessDate === today)) {
         outcomes.push({ source_key: source.source_key, status: "skipped", note: "daily collection already attempted/succeeded" });
         continue;
@@ -547,6 +607,10 @@ Deno.serve(async (req) => {
           const result = await ingestKraken(source);
           priceCount += Number(result.count);
           outcomes.push({ source_key: source.source_key, status: "succeeded", ...result });
+        } else if (source.source_key === "coinbase_public_crypto") {
+          const result = await ingestCoinbasePublicHistory(source);
+          priceCount += Number(result.count);
+          outcomes.push({ source_key: source.source_key, status: "succeeded", history_count: result.count, history_symbols: result.symbols, history_failures: result.failures });
         } else if (source.source_key === "alpha_vantage_us_movers") {
           const result = await ingestAlphaVantage(source);
           priceCount += Number(result.count);
