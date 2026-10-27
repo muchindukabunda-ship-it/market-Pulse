@@ -27,11 +27,49 @@ function historyCell(row){
  const title=points[0].date+" to "+points[points.length-1].date+" · "+points.length+" daily bars";
  return '<div class="history-cell" title="'+escapeHtml(title)+'"><svg viewBox="0 0 96 32" role="img" aria-label="'+escapeHtml(title)+' price trend"><path d="'+path+'" class="'+(positive?"up":"down")+'" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg><span class="'+(positive?"up":"down")+'">'+(positive?"+":"")+pct.toFixed(1)+'%</span></div>';
 }
-function renderRows(){const rows=currentRows(state.kind);document.getElementById("board-title").textContent=state.kind==="stock"?"Equity signals":"Digital asset signals";if(!rows.length){body.innerHTML='<tr><td colspan="6" class="loading-row">No qualifying signals are available for this market date yet.</td></tr>';renderAllocation();return;}body.innerHTML=rows.map(row=>{const score=Math.max(0,Math.min(100,number(row.score))),change=number(row.change_pct),symbol=escapeHtml(row.symbol),changeClass=change<0?"table-change negative":"table-change";return '<tr><td><div class="asset-id"><span class="rank-mini">'+String(row.rank).padStart(2,"0")+'</span><span class="coin-mark">'+escapeHtml(symbol.slice(0,3))+'</span><span class="asset-label"><strong>'+symbol+'</strong><span>'+escapeHtml(row.name)+'</span></span></div></td><td class="table-price">'+money(row.last_price)+'</td><td class="table-history">'+historyCell(row)+'</td><td class="'+changeClass+'">'+(change>0?"+":"")+change.toFixed(2)+'%</td><td class="table-turnover">'+compactMoney(row.approx_usd_turnover)+'</td><td><div class="table-signal">'+miniGauge(score)+'<span class="signal-word">'+(score>=75?"STRONG":score>=50?"MID":"LOW")+'</span></div></td></tr>';}).join("");renderAllocation();}
+function entryReference(row){
+ const points=Array.isArray(row.history)?row.history.filter(p=>Number.isFinite(Number(p.close))&&Number(p.close)>0):[];
+ if(points.length>=20){const recent=points.slice(-20);return {price:recent.reduce((sum,p)=>sum+Number(p.close),0)/recent.length,method:"20-day SMA"};}
+ return {price:number(row.last_price),method:"last snapshot · history limited"};
+}
+function quoteFor(row){return state.data?.live_quotes?.[row.symbol]||{};}
+function priceCell(price,label,title="",live=false){
+ const display=Number.isFinite(Number(price))&&Number(price)>0?money(price):"—";
+ return '<td class="table-pricepair" title="'+escapeHtml(title)+'"><strong>'+display+'</strong><small class="'+(live?"price-live":"price-stale")+'">'+escapeHtml(label)+'</small></td>';
+}
+function dayAverageCell(row){
+ const quote=quoteFor(row),avg=Number(quote.day_average);
+ if(!Number.isFinite(avg)||avg<=0)return '<td class="table-pricepair" title="No intraday average is available for this asset."><strong>—</strong><small class="price-stale">not available</small></td>';
+ return priceCell(avg,"5m VWAP est.",quote.source+" · "+(quote.bars_today||0)+" bars today");
+}
+function currentPriceCell(row){
+ const quote=quoteFor(row),live=quote.live===true&&Number(quote.current_price)>0;
+ const value=live?quote.current_price:row.last_price;
+ const label=live?"LIVE · "+(quote.quote_mode||"feed"):"LAST REFRESHED";
+ return priceCell(value,label,(quote.source||"ranking snapshot")+" · "+formatTime(quote.quote_time||quote.refreshed_at||row.observed_at),live);
+}
+function renderRows(){const rows=currentRows(state.kind);document.getElementById("board-title").textContent=state.kind==="stock"?"Equity signals":"Digital asset signals";if(!rows.length){body.innerHTML='<tr><td colspan="8" class="loading-row">No qualifying signals are available for this market date yet.</td></tr>';renderAllocation();return;}body.innerHTML=rows.map(row=>{const score=Math.max(0,Math.min(100,number(row.score))),change=number(row.change_pct),symbol=escapeHtml(row.symbol),changeClass=change<0?"table-change negative":"table-change",entry=entryReference(row);return '<tr><td><div class="asset-id"><span class="rank-mini">'+String(row.rank).padStart(2,"0")+'</span><span class="coin-mark">'+escapeHtml(symbol.slice(0,3))+'</span><span class="asset-label"><strong>'+symbol+'</strong><span>'+escapeHtml(row.name)+'</span></span></div></td>'+priceCell(entry.price,entry.method,"Calculated reference; experimental and not backtested")+dayAverageCell(row)+currentPriceCell(row)+'<td class="table-history">'+historyCell(row)+'</td><td class="'+changeClass+'">'+(change>0?"+":"")+change.toFixed(2)+'%</td><td class="table-turnover">'+compactMoney(row.approx_usd_turnover)+'</td><td><div class="table-signal">'+miniGauge(score)+'<span class="signal-word">'+(score>=75?"STRONG":score>=50?"MID":"LOW")+'</span></div></td></tr>';}).join("");renderAllocation();}
 function renderMovement(){const rows=[...currentRows(state.chartKind)].sort((a,b)=>number(b.change_pct)-number(a.change_pct)).slice(0,5);const chart=document.getElementById("move-chart");if(!rows.length){chart.innerHTML='<div class="allocation-empty">No movement snapshot available.</div>';return;}const max=Math.max(1,...rows.map(r=>Math.abs(number(r.change_pct))));chart.innerHTML=rows.map(r=>{const v=number(r.change_pct),width=Math.max(2,Math.abs(v)/max*46),neg=v<0;return '<div class="move-row"><span class="move-symbol">'+escapeHtml(r.symbol)+'</span><div class="move-track"><span class="move-bar '+(neg?"negative":"")+'" style="width:'+width+'%"></span></div><span class="move-value '+(neg?"negative":"")+'">'+(v>0?"+":"")+v.toFixed(2)+'%</span></div>';}).join("");}
 function renderAllocation(){const budget=Math.max(0,number(document.getElementById("budget").value)),exposure=number(document.getElementById("exposure").value),rows=currentRows(state.kind).slice(0,5),model=budget*exposure/100,reserve=budget-model,each=rows.length?model/rows.length:0;document.getElementById("exposure-label").textContent=exposure.toFixed(0)+"%";document.getElementById("model-amount").textContent=money(model);document.getElementById("reserve-amount").textContent=money(reserve);const chart=document.getElementById("allocation-donut");const used=rows.length?exposure:0;const hue=rows.map((r,i)=>colors[i%colors.length]+" "+(i*used/rows.length)+"% "+((i+1)*used/rows.length)+"%");if(used<100)hue.push("#344447 "+used+"% 100%");chart.style.background="conic-gradient("+ (hue.length?hue.join(","):"#344447 0% 100%")+ ")";chart.innerHTML='<span>'+(rows.length?rows.length+" assets":"—")+'<small>EQUAL SPLIT</small></span>';const out=document.getElementById("allocation-rows");if(!rows.length){out.innerHTML='<div class="allocation-empty">Load a market board to model a split.</div>';return;}out.innerHTML=rows.map((r,i)=>'<div class="allocation-row"><div class="allocation-asset"><i class="allocation-color" style="background:'+colors[i%colors.length]+'"></i><div>'+escapeHtml(r.symbol)+'<small>Rank '+String(r.rank).padStart(2,"0")+' · score '+number(r.score).toFixed(0)+'</small></div></div><div class="allocation-amount">'+money(each)+'<small>'+(exposure/rows.length).toFixed(1)+'% of scenario</small></div></div>').join("");}
 function applyData(data){state.data=data;errorBox.hidden=true;renderSummary();renderRows();renderMovement();}
-async function loadData(showToast=false){refreshButton.disabled=true;statusEl.innerHTML='<span class="live-dot"></span> Refreshing feed';try{const response=await fetch("/api/rankings",{method:"GET",cache:"no-store",headers:{"Accept":"application/json"}});if(!response.ok)throw new Error("Dashboard data could not be loaded ("+response.status+").");applyData(await response.json());if(showToast){const toast=document.getElementById("toast");toast.textContent="Latest market snapshot loaded.";toast.classList.add("show");setTimeout(()=>toast.classList.remove("show"),2200);}}catch(error){errorBox.textContent=error.message||"Connection failed. Try refreshing.";errorBox.hidden=false;statusEl.textContent="Feed needs attention";if(!state.data)body.innerHTML='<tr><td colspan="5" class="loading-row">Could not reach Market Pulse. Check the protected data endpoint and try again.</td></tr>';}finally{refreshButton.disabled=false;}}
+async function refreshLiveQuotes(){
+ if(!state.data)return;
+ const symbols=(state.data.crypto||[]).map(row=>row.symbol).filter(Boolean).slice(0,10);
+ if(!symbols.length)return;
+ try{
+  const response=await fetch("/api/live-prices?symbols="+encodeURIComponent(symbols.join(",")),{method:"GET",cache:"no-store",headers:{"Accept":"application/json"}});
+  if(!response.ok)throw new Error("live price feed unavailable");
+  const payload=await response.json();
+  state.data.live_quotes=payload.quotes||{};
+  state.data.live_refreshed_at=payload.refreshed_at||new Date().toISOString();
+  renderRows();
+  statusEl.innerHTML='<i class="live-dot"></i> Quotes updated '+escapeHtml(formatTime(state.data.live_refreshed_at));
+ }catch{
+  state.data.live_quotes=state.data.live_quotes||{};
+  statusEl.innerHTML='<i class="live-dot"></i> Using last refreshed prices';
+ }
+}
+async function loadData(showToast=false){refreshButton.disabled=true;statusEl.innerHTML='<span class="live-dot"></span> Refreshing feed';try{const response=await fetch("/api/rankings",{method:"GET",cache:"no-store",headers:{"Accept":"application/json"}});if(!response.ok)throw new Error("Dashboard data could not be loaded ("+response.status+").");applyData(await response.json());await refreshLiveQuotes();if(showToast){const toast=document.getElementById("toast");toast.textContent="Market board and available live prices refreshed.";toast.classList.add("show");setTimeout(()=>toast.classList.remove("show"),2200);}}catch(error){errorBox.textContent=error.message||"Connection failed. Try refreshing.";errorBox.hidden=false;statusEl.textContent="Feed needs attention";if(!state.data)body.innerHTML='<tr><td colspan="8" class="loading-row">Could not reach Market Pulse. Check the protected data endpoint and try again.</td></tr>';}finally{refreshButton.disabled=false;}}
 function setMarket(kind){state.kind=kind;document.querySelectorAll(".market-tab").forEach(tab=>{const active=tab.dataset.kind===kind;tab.classList.toggle("active",active);tab.setAttribute("aria-selected",String(active));});document.querySelectorAll(".side-nav [data-kind]").forEach(btn=>btn.classList.toggle("active",btn.dataset.kind===kind));renderRows();}
 document.querySelectorAll(".market-tab").forEach(tab=>tab.addEventListener("click",()=>setMarket(tab.dataset.kind)));
 document.querySelectorAll(".side-nav [data-kind]").forEach(btn=>btn.addEventListener("click",()=>setMarket(btn.dataset.kind)));
@@ -39,4 +77,4 @@ document.getElementById("chart-kind").addEventListener("change",event=>{state.ch
 document.getElementById("budget").addEventListener("input",renderAllocation);
 document.getElementById("exposure").addEventListener("input",event=>{const v=number(event.target.value);event.target.style.background="linear-gradient(90deg,#66e4b1 "+v+"%,#314447 "+v+"%)";renderAllocation();});
 refreshButton.addEventListener("click",()=>loadData(true));
-loadData();
+loadData();setInterval(()=>refreshLiveQuotes(),60000);
