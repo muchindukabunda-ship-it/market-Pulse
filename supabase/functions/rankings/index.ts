@@ -155,7 +155,8 @@ async function predictionsFor(rows: Array<Record<string, any>>, marketDate: stri
   forecastUrl.searchParams.set("order", "asset_type.asc,rank.asc");
   const forecastResponse = await fetch(forecastUrl, { headers: baseHeaders });
   if (!forecastResponse.ok) return null;
-  const forecasts = await forecastResponse.json() as Array<Record<string, any>>;\n  for (const forecast of forecasts) forecast.news_context = rows.find((row) => row.asset_id === forecast.asset_id)?.news_context || [];
+  const forecasts = await forecastResponse.json() as Array<Record<string, any>>;
+  for (const forecast of forecasts) forecast.news_context = rows.find((row) => row.asset_id === forecast.asset_id)?.news_context || [];
 
   const historyUrl = new URL(predictionsUrl);
   historyUrl.searchParams.set("target_date", `lte.${marketDate}`);
