@@ -32,7 +32,7 @@
 <main class="main-content" id="overview">
 <header class="topbar">
 <div class="crumb"><span class="crumb-home">MP</span><span>/</span><span>Intelligence terminal</span></div>
-<div class="top-actions"><div class="live-chip"><span class="live-dot"></span><span>DATA SNAPSHOT</span></div><button id="refresh" class="refresh-btn" type="button"><span class="refresh-icon">↻</span><span>Refresh</span></button><div class="avatar">MP</div></div>
+<div class="top-actions"><div class="live-chip"><span class="live-dot"></span><span>LIVE + LAST REFRESHED</span></div><button id="refresh" class="refresh-btn" type="button"><span class="refresh-icon">↻</span><span>Refresh</span></button><div class="avatar">MP</div></div>
 </header>
 <section class="welcome-row">
 <div><div class="eyebrow"><span class="eyebrow-mark"></span> PERSONAL MARKET INTELLIGENCE <span class="eyebrow-sep">/</span><span id="market-date">LOADING</span></div><h1>See the signal.<br><span>Size the scenario.</span></h1><p class="welcome-copy">Momentum, liquidity, and daily market movement in one decision workspace.</p></div>
@@ -61,8 +61,8 @@
 <article class="panel board-panel" id="markets">
 <div class="panel-heading board-heading"><div><div class="eyebrow small">RANKED OPPORTUNITY BOARD</div><h2 id="board-title">Equity signals</h2><p class="panel-subtitle">Ranked by the current momentum + liquidity model</p></div><div class="market-switch" role="tablist" aria-label="Select asset market"><button class="market-tab active" type="button" data-kind="stock" role="tab" aria-selected="true">Equities <span id="stock-tab-count">—</span></button><button class="market-tab" type="button" data-kind="crypto" role="tab" aria-selected="false">Crypto <span id="crypto-tab-count">—</span></button></div></div>
 <div id="error" class="error-box" hidden></div>
-<div class="asset-table-wrap"><table class="asset-table"><thead><tr><th>RANK / ASSET</th><th>LAST PRICE</th><th>90D PRICE TREND</th><th>DAY MOVE</th><th>TURNOVER*</th><th>SIGNAL</th></tr></thead><tbody id="rankings"><tr><td colspan="6" class="loading-row">Connecting to your market feed…</td></tr></tbody></table></div>
-<div class="board-foot"><span>* Provider-reported volume × price; approximate.</span><span id="board-method">Scores are relative, not probabilities.</span></div>
+<div class="asset-table-wrap"><table class="asset-table"><thead><tr><th>RANK / ASSET</th><th>SUGGESTED BUY*</th><th>DAY AVG†</th><th>CURRENT PRICE</th><th>90D PRICE TREND</th><th>DAY MOVE</th><th>TURNOVER*</th><th>SIGNAL</th></tr></thead><tbody id="rankings"><tr><td colspan="8" class="loading-row">Connecting to your market feed…</td></tr></tbody></table></div>
+<div class="board-foot"><span>* 20-day average reference; snapshot fallback if history is missing.</span><span>† Day average = 5-minute volume-weighted typical-price estimate. Snapshot/live sources and timestamps shown per row.</span></div>
 </article>
 <aside class="panel allocation-panel" id="allocation">
 <div class="panel-heading"><div><div class="eyebrow small">WHAT-IF TOOL</div><h2>Allocation lab</h2></div><span class="lab-icon">◌</span></div>
