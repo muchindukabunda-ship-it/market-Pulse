@@ -120,6 +120,17 @@ async function predictionsFor(rows: Array<Record<string, any>>, marketDate: stri
   // Stocks forecast the next weekday; crypto forecasts the next calendar day.
   const stockTarget = nextDate(marketDate, true);
   const cryptoTarget = nextDate(marketDate, false);
+  const targetDates = [...new Set([stockTarget, cryptoTarget])];
+  // Remove only obsolete forecasts for upcoming sessions. Past forecasts stay
+  // untouched for the historical audit trail.
+  try {
+    const oldForecastsUrl = new URL(predictionsUrl);
+    oldForecastsUrl.searchParams.set("target_date", "in.(" + targetDates.join(",") + ")");
+    oldForecastsUrl.searchParams.set("method_version", "neq.risk-aware-screen-v2");
+    await fetch(oldForecastsUrl, { method: "DELETE", headers: { ...baseHeaders, Prefer: "return=minimal" } });
+  } catch {
+    // Do not block current rankings if forecast cleanup is unavailable.
+  }
   const candidates = rows.filter((row) => row.asset_id && row.symbol && Number(row.last_price) > 0);
   const forecastRows = candidates.map((row) => ({
     target_date: row.asset_type === "stock" ? stockTarget : cryptoTarget,
@@ -132,7 +143,7 @@ async function predictionsFor(rows: Array<Record<string, any>>, marketDate: stri
     snapshot_price: row.last_price,
     source_market_date: marketDate,
     source_generated_at: generatedAt,
-    method_version: row.method_version || "momentum-liquidity-v1",
+    method_version: "risk-aware-screen-v2",
   }));
   if (forecastRows.length) {
     try {
@@ -148,9 +159,9 @@ async function predictionsFor(rows: Array<Record<string, any>>, marketDate: stri
     }
   }
 
-  const targetDates = [...new Set([stockTarget, cryptoTarget])];
   const forecastUrl = new URL(predictionsUrl);
   forecastUrl.searchParams.set("target_date", "in.(" + targetDates.join(",") + ")");
+  forecastUrl.searchParams.set("method_version", "eq.risk-aware-screen-v2");
   forecastUrl.searchParams.set("select", "target_date,asset_type,asset_id,symbol,name,rank,score,snapshot_price,source_market_date,source_generated_at,method_version,forecasted_at,result_close,result_return_pct,result_5d_close,result_5d_return_pct,result_20d_close,result_20d_return_pct,benchmark_symbol,benchmark_1d_return_pct,benchmark_5d_return_pct,benchmark_20d_return_pct,excess_1d_return_pct,excess_5d_return_pct,excess_20d_return_pct,evaluated_at");
   forecastUrl.searchParams.set("order", "asset_type.asc,rank.asc");
   const forecastResponse = await fetch(forecastUrl, { headers: baseHeaders });
@@ -160,6 +171,7 @@ async function predictionsFor(rows: Array<Record<string, any>>, marketDate: stri
 
   const historyUrl = new URL(predictionsUrl);
   historyUrl.searchParams.set("target_date", `lte.${marketDate}`);
+  historyUrl.searchParams.set("method_version", "eq.risk-aware-screen-v2");
   historyUrl.searchParams.set("select", "asset_type,result_return_pct,result_5d_return_pct,result_20d_return_pct,excess_1d_return_pct,excess_5d_return_pct,excess_20d_return_pct");
   historyUrl.searchParams.set("order", "target_date.desc");
   historyUrl.searchParams.set("limit", "1000");
@@ -191,8 +203,8 @@ async function predictionsFor(rows: Array<Record<string, any>>, marketDate: stri
     stock_target_date: stockTarget,
     crypto_target_date: cryptoTarget,
     forecasted_at: savedForecastAt,
-    method: "momentum-liquidity-v1",
-    performance_note: "Historical next-session returns; descriptive only, not a validated or self-training model.",
+    method: "risk-aware-screen-v2",
+    performance_note: "Historical results are descriptive and gross of fees, spreads, taxes, and slippage; no walk-forward validation or calibrated probability is claimed.",
     stocks: forecasts.filter((item) => item.asset_type === "stock"),
     crypto: forecasts.filter((item) => item.asset_type === "crypto"),
     track_record: trackRecord,
@@ -238,6 +250,44 @@ function hasStrongEntityEvidence(row: Record<string, any>, mention: Record<strin
   const excluded = new Set(["inc","incorporated","corp","corporation","company","co","ltd","limited","plc","holdings","group","the","and","of","class"]);
   const terms = String(row.name || "").toLowerCase().split(/[^a-z0-9]+/).filter((word: string) => word.length >= 4 && !excluded.has(word));
   return terms.length > 0 && terms.some((word: string) => new RegExp("\\b" + word + "\\b", "i").test(text));
+}
+
+function buildRiskMetrics(
+  history: Array<{ date: string; close: number }>,
+  currentPrice: number,
+  assetType: string,
+  changePct: number,
+) {
+  const series = history
+    .filter((point) => Number.isFinite(Number(point.close)) && Number(point.close) > 0)
+    .map((point) => Number(point.close));
+  if (Number.isFinite(currentPrice) && currentPrice > 0) series.push(currentPrice);
+  const recent = series.slice(-21);
+  const returns: number[] = [];
+  for (let i = 1; i < recent.length; i++) returns.push(recent[i] / recent[i - 1] - 1);
+  let peak = 0;
+  let maxDrawdown = 0;
+  for (const price of recent) {
+    peak = Math.max(peak, price);
+    if (peak > 0) maxDrawdown = Math.min(maxDrawdown, price / peak - 1);
+  }
+  const mean = returns.length ? returns.reduce((sum, value) => sum + value, 0) / returns.length : 0;
+  const variance = returns.length > 1
+    ? returns.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / (returns.length - 1)
+    : null;
+  const periodsPerYear = assetType === "crypto" ? 365 : 252;
+  const annualizedVolatility = variance === null ? null : Math.sqrt(variance * periodsPerYear) * 100;
+  const returnFrom = (barsAgo: number) => series.length > barsAgo
+    ? ((series[series.length - 1] / series[series.length - 1 - barsAgo]) - 1) * 100
+    : null;
+  return {
+    history_bars: Math.max(0, series.length - 1),
+    momentum_5d_pct: returnFrom(5),
+    momentum_20d_pct: returnFrom(20),
+    annualized_volatility_20d_pct: annualizedVolatility,
+    max_drawdown_20d_pct: recent.length >= 21 ? maxDrawdown * 100 : null,
+    large_daily_move: Math.abs(changePct) >= 20,
+  };
 }
 
 async function buildResearchContext(rows: Array<Record<string, any>>) {
@@ -373,6 +423,12 @@ Deno.serve(async (req: Request) => {
     row.history_return_pct = points.length > 1 && points[0].close > 0
       ? ((points[points.length - 1].close / points[0].close) - 1) * 100
       : null;
+    row.risk_metrics = buildRiskMetrics(
+      row.history as Array<{ date: string; close: number }>,
+      Number(row.last_price),
+      String((row as Record<string, any>).asset_type || ""),
+      Number((row as Record<string, any>).change_pct || 0),
+    );
   }
   const generatedAt = rows.reduce((latest: string | null, row: { generated_at: string }) =>
     !latest || row.generated_at > latest ? row.generated_at : latest, null);
@@ -384,12 +440,22 @@ Deno.serve(async (req: Request) => {
   return json({
     market_date: marketDate,
     generated_at: generatedAt,
-    scoring_method: "momentum-liquidity-v1",
+    scoring_method: "risk-aware-screen-v2",
+    universe_note: "Ranks only assets surfaced by the configured daily-mover and USD-market feeds. This is not a scan of every U.S.-listed security or every crypto asset.",
+    eligibility: {
+      minimum_prior_daily_bars: 20,
+      minimum_approx_usd_turnover: 1000000,
+      stock_minimum_price: 5,
+      maximum_candidates_per_asset_type: 10,
+      may_return_fewer_than_ten: true,
+    },
     limitations: [
-      "Experimental momentum/liquidity screen; not a buy recommendation.",
+      "Experimental relative research screen; not a probability of gain or a buy recommendation.",
+      "Candidates need at least 20 prior daily bars and approximately $1 million in turnover; the list can be shorter than ten or empty.",
+      "The candidate universe is limited to configured daily movers and exchange markets, not every U.S. listing or digital asset.",
       "Tomorrow's list is a ranked watchlist, not a price target or a promise of positive returns.",
-      "Historical charts do not change the score; performance tracking is descriptive and does not automatically retrain the model.",
-      "News sentiment is not included in the score.",
+      "The score blends current and 5/20-bar momentum, approximate turnover, realized volatility, and drawdown; news sentiment and fundamentals are not score inputs.",
+      "Forecast tracking is descriptive, gross of trading costs, and not a validated walk-forward backtest; it does not automatically retrain the model.",
     ],
     stocks: rows.filter((row: { asset_type: string }) => row.asset_type === "stock"),
     crypto: rows.filter((row: { asset_type: string }) => row.asset_type === "crypto"),

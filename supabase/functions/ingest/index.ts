@@ -297,11 +297,9 @@ async function ingestKrakenHistory(
     if (!asset_id || close === null || volume === null) return [];
     return [{ pairKey, symbol, asset_id, turnover: close * volume }];
   }).sort((a, b) => b.turnover - a.turnover);
-  const marketDate = new Date().toISOString().slice(0, 10);
-  const currentBoard = await db("daily_rankings?market_date=eq." + marketDate + "&asset_type=eq.crypto&order=rank.asc&select=symbol&limit=10");
-  const preferredSymbols = [...new Set(["BTC", ...currentBoard.map((row: { symbol: string }) => String(row.symbol).toUpperCase())])];
-  const preferredAssets = preferredSymbols.map((symbol) => ranked.find((item) => item.symbol === symbol)).filter(Boolean);
-  const selected = [...new Map([...preferredAssets, ...ranked].map((item) => [item.asset_id, item])).values()].slice(0, 12);
+  // Historical calls go to the highest-turnover current USD markets. Looking
+  // only at yesterday's winners caused today's eligible coins to have no bars.
+  const selected = ranked.slice(0, 12);
   const today = new Date().toISOString().slice(0, 10);
   const observedAt = new Date().toISOString();
   const historyRows: Array<Record<string, unknown>> = [];
@@ -349,7 +347,7 @@ async function ingestKrakenHistory(
   return { count: historyRows.length, symbols: selected.map((item) => item.symbol), failures };
 }
 
-async function ingestKraken(source: Source) {
+async function ingestKraken(source: Source, includeHistory = true) {
   const [pairsRes, tickerRes] = await Promise.all([
     request("https://api.kraken.com/0/public/AssetPairs"),
     request("https://api.kraken.com/0/public/Ticker"),
@@ -379,7 +377,9 @@ async function ingestKraken(source: Source) {
   }
   const prices = [...pricesByAsset.values()];
   await upsert("daily_prices", prices, "asset_id,source_id,market_date,interval");
-  const history = await ingestKrakenHistory(source, pairEntries, tickers, idBySymbol);
+  const history = includeHistory
+    ? await ingestKrakenHistory(source, pairEntries, tickers, idBySymbol)
+    : { count: 0, symbols: [] as string[], failures: [] as string[] };
   return { count: prices.length, history_count: history.count, history_symbols: history.symbols, history_failures: history.failures };
 }
 
@@ -507,7 +507,7 @@ async function ingestAlphaVantageHistory(
   return { count, symbols: collected, failures };
 }
 
-async function ingestAlphaVantage(source: Source) {
+async function ingestAlphaVantage(source: Source, includeHistory = true) {
   const key = Deno.env.get("ALPHA_VANTAGE_API_KEY");
   if (!key) return { count: 0, skipped: true, note: "ALPHA_VANTAGE_API_KEY not configured", history_count: 0 };
   const today = new Date().toISOString().slice(0, 10);
@@ -525,18 +525,31 @@ async function ingestAlphaVantage(source: Source) {
   const symbols = [...new Set(movers.map((m: Record<string, string>) => String(m.ticker).toUpperCase()).filter(Boolean))];
   const currentBoard = await db("daily_rankings?market_date=eq." + today + "&asset_type=eq.stock&order=rank.asc&select=symbol&limit=10");
   const boardSymbols = currentBoard.map((row: { symbol: string }) => String(row.symbol).toUpperCase());
+  // Spend the limited daily-bar calls on the same liquid, positive movers the
+  // ranking screen is eligible to consider, not yesterday's board or raw
+  // provider order. Keep one slot for SPY as the equity benchmark.
+  const historyCandidates = movers
+    .map((m: Record<string, string>) => ({
+      symbol: String(m.ticker || "").toUpperCase(),
+      price: num(m.price) ?? 0,
+      volume: num(m.volume) ?? 0,
+      changePct: num(String(m.change_percentage || "").replace("%", "")) ?? -Infinity,
+      category: String(m.category || ""),
+    }))
+    .filter((m) => /^[A-Z][A-Z0-9.-]{0,9}$/.test(m.symbol)
+      && !/[./-](W|WS|WT|U|R|P)$/i.test(m.symbol)
+      && !/\b(etf|warrant|preferred)\b/i.test(m.category)
+      && m.price >= 5 && m.volume >= 1_000_000 && m.changePct > 0)
+    .sort((a, b) => (b.price * b.volume) - (a.price * a.volume));
   const historySymbols = [...new Set([
-    ...boardSymbols,
+    ...historyCandidates.slice(0, 11).map((m) => m.symbol),
     "SPY",
-    ...active.slice(0, 4).map((m: Record<string, string>) => String(m.ticker).toUpperCase()),
-    ...gainers.slice(0, 2).map((m: Record<string, string>) => String(m.ticker).toUpperCase()),
-    ...losers.slice(0, 2).map((m: Record<string, string>) => String(m.ticker).toUpperCase()),
-  ].filter(Boolean))].slice(0, 12);
+  ])].slice(0, 12);
   await upsertAssets([
     ...symbols.map((symbol) => ({ asset_type: "stock", symbol, name: symbol, provider_symbol: symbol, aliases: [], active: true })),
     { asset_type: "stock", symbol: "SPY", name: "SPDR S&P 500 ETF Trust", provider_symbol: "SPY", aliases: [], active: true },
   ]);
-  const lookupSymbols = [...new Set([...symbols, "SPY", ...boardSymbols])];
+  const lookupSymbols = [...new Set([...symbols, "SPY", ...boardSymbols, ...historySymbols])];
   const assets = await db("asset_instruments?asset_type=eq.stock&symbol=in.(" + lookupSymbols.map(encodeURIComponent).join(",") + ")&select=id,symbol");
   const idBySymbol = new Map(assets.map((a: { id: string; symbol: string }) => [a.symbol, a.id]));
   const prices = movers.flatMap((m: Record<string, string>) => {
@@ -549,7 +562,9 @@ async function ingestAlphaVantage(source: Source) {
     }];
   });
   await upsert("daily_prices", prices, "asset_id,source_id,market_date,interval");
-  const history = await ingestAlphaVantageHistory(source, historySymbols, idBySymbol, key);
+  const history = includeHistory
+    ? await ingestAlphaVantageHistory(source, historySymbols, idBySymbol, key)
+    : { count: 0, symbols: [] as string[], failures: [] as string[] };
   return {
     count: prices.length,
     skipped: false,
@@ -593,8 +608,8 @@ Deno.serve(async (req) => {
       const today = new Date().toISOString().slice(0, 10);
       const lastAttemptDate = source.last_attempted_at?.slice(0, 10);
       const lastSuccessDate = source.last_successful_at?.slice(0, 10);
-      const onceDaily = ["sec_company_tickers", "alpha_vantage_us_movers", "kraken_usd_markets", "coinbase_public_crypto"].includes(source.source_key);
-      if (onceDaily && (source.source_key === "alpha_vantage_us_movers" ? lastAttemptDate === today : lastSuccessDate === today)) {
+      const onceDaily = ["sec_company_tickers", "coinbase_public_crypto"].includes(source.source_key);
+      if (onceDaily && lastSuccessDate === today) {
         outcomes.push({ source_key: source.source_key, status: "skipped", note: "daily collection already attempted/succeeded" });
         continue;
       }
@@ -607,7 +622,7 @@ Deno.serve(async (req) => {
         if (source.source_key === "sec_company_tickers") {
           assetsCount += await ingestSecUniverse();
         } else if (source.source_key === "kraken_usd_markets") {
-          const result = await ingestKraken(source);
+          const result = await ingestKraken(source, lastSuccessDate !== today);
           priceCount += Number(result.count);
           outcomes.push({ source_key: source.source_key, status: "succeeded", ...result });
         } else if (source.source_key === "coinbase_public_crypto") {
@@ -615,7 +630,9 @@ Deno.serve(async (req) => {
           priceCount += Number(result.count);
           outcomes.push({ source_key: source.source_key, status: "succeeded", history_count: result.count, history_symbols: result.symbols, history_failures: result.failures });
         } else if (source.source_key === "alpha_vantage_us_movers") {
-          const result = await ingestAlphaVantage(source);
+          // Refresh mover snapshots every collector cycle; spend the limited
+          // daily-bar calls only on the first successful collection of the day.
+          const result = await ingestAlphaVantage(source, lastSuccessDate !== today);
           priceCount += Number(result.count);
           outcomes.push({ source_key: source.source_key, status: result.skipped ? "skipped" : "succeeded", ...result });
         } else {

@@ -14,8 +14,10 @@ function currentRows(kind){return kind==="stock"?(state.data?.stocks||[]):(state
 function averageScore(rows){return rows.length?rows.reduce((a,r)=>a+number(r.score),0)/rows.length:0;}
 function gaugeLabel(score){if(score>=75)return "High relative signal";if(score>=50)return "Moderate relative signal";if(score>0)return "Lower relative signal";return "No signal data";}
 function setGauge(score){const clipped=Math.max(0,Math.min(100,score));document.getElementById("gauge-number").textContent=clipped.toFixed(0);document.getElementById("gauge-ring").style.strokeDashoffset=String(452.4*(1-clipped/100));document.getElementById("gauge-label").textContent=gaugeLabel(clipped);document.getElementById("gauge-description").textContent="Average score across "+(state.data?.stocks?.length||0)+" stocks and "+(state.data?.crypto?.length||0)+" coins in today’s board. A relative model score—not odds of a gain.";}
-function renderTopBoards(){for(const [key,id] of [["stocks","top-stock-list"],["crypto","top-crypto-list"]]){const list=document.getElementById(id);if(!list)continue;const rows=(state.data?.[key]||[]).slice(0,5);list.innerHTML=rows.map((row,i)=>{const q=state.data?.live_quotes?.[row.symbol],price=Number(q?.price)||number(row.last_price),move=number(row.change_pct),score=Math.max(0,Math.min(100,number(row.score)));return '<div class="mini-board-row"><span class="mini-rank">'+String(i+1).padStart(2,"0")+' <b>'+escapeHtml(row.symbol)+'</b></span><span class="mini-price">'+money(price)+'</span><span class="mini-move '+(move<0?"negative":"")+'">'+(move>0?"+":"")+move.toFixed(1)+'%</span><span class="attention-track"><i style="width:'+score+'%"></i></span></div>'}).join("")||'<div class="mini-empty">No qualifying candidates in the latest snapshot.</div>';}}
-function renderTicker(){const el=document.getElementById("market-ticker-items");if(!el)return;const rows=[...(state.data?.stocks||[]).slice(0,3),...(state.data?.crypto||[]).slice(0,3)];el.innerHTML=rows.map(row=>{const q=state.data?.live_quotes?.[row.symbol],price=Number(q?.price)||number(row.last_price),move=number(row.change_pct);return '<span class="ticker-item"><b>'+escapeHtml(row.symbol)+'</b><strong>'+money(price)+'</strong><em class="'+(move<0?"negative":"")+'">'+(move>0?"+":"")+move.toFixed(2)+'%</em></span>'}).join("")||'<span>No ranked snapshots available</span>';}
+function quotedMove(row){const q=state.data?.live_quotes?.[row.symbol];return q?.change_pct!==null&&q?.change_pct!==undefined&&Number.isFinite(Number(q.change_pct))?Number(q.change_pct):number(row.change_pct);}
+function quotedPrice(row){const q=state.data?.live_quotes?.[row.symbol];return Number(q?.current_price)>0?Number(q.current_price):number(row.last_price);}
+function renderTopBoards(){for(const [key,id] of [["stocks","top-stock-list"],["crypto","top-crypto-list"]]){const list=document.getElementById(id);if(!list)continue;const rows=(state.data?.[key]||[]).slice(0,5);list.innerHTML=rows.map((row,i)=>{const price=quotedPrice(row),move=quotedMove(row),score=Math.max(0,Math.min(100,number(row.score)));return '<div class="mini-board-row"><span class="mini-rank">'+String(i+1).padStart(2,"0")+' <b>'+escapeHtml(row.symbol)+'</b></span><span class="mini-price">'+money(price)+'</span><span class="mini-move '+(move<0?"negative":"")+'">'+(move>0?"+":"")+move.toFixed(1)+'%</span><span class="attention-track"><i style="width:'+score+'%"></i></span></div>'}).join("")||'<div class="mini-empty">No qualified candidates. The screen will not pad the list without sufficient data.</div>';}}
+function renderTicker(){const el=document.getElementById("market-ticker-items");if(!el)return;const rows=[...(state.data?.stocks||[]).slice(0,3),...(state.data?.crypto||[]).slice(0,3)];el.innerHTML=rows.map(row=>{const price=quotedPrice(row),move=quotedMove(row);return '<span class="ticker-item"><b>'+escapeHtml(row.symbol)+'</b><strong>'+money(price)+'</strong><em class="'+(move<0?"negative":"")+'">'+(move>0?"+":"")+move.toFixed(2)+'%</em></span>'}).join("")||'<span>No ranked snapshots available</span>';}
 function renderDataHealth(){
  const health=state.data?.data_health||{},sources=state.data?.source_health||[];
  const total=Number(health.sources)||sources.length,fresh=Number(health.fresh_sources)||0,history=Number(health.assets_with_history)||0,candidates=Number(health.candidate_assets)||0,articles=Number(health.linked_articles)||0;
@@ -53,13 +55,14 @@ function priceCell(price,label,title="",live=false){
 function dayAverageCell(row){
  const quote=quoteFor(row),avg=Number(quote.day_average);
  if(!Number.isFinite(avg)||avg<=0)return '<td class="table-pricepair" title="No intraday average is available for this asset."><strong>—</strong><small class="price-stale">not available</small></td>';
- const method=String(quote.source||"").includes("Alpaca IEX")?"IEX session VWAP":"5m VWAP estimate";return priceCell(avg,method,quote.source+" · "+(quote.bars_today||0)+" bars today");
+ const method=quote.average_method||(String(quote.source||"").includes("Alpaca IEX")?"IEX session VWAP":String(quote.source||"").includes("Coinbase")?"24h VWAP estimate":"VWAP estimate");return priceCell(avg,method,quote.source+" · "+(quote.bars_today||0)+" bars in window");
 }
 function currentPriceCell(row){
- const quote=quoteFor(row),live=quote.live===true&&Number(quote.current_price)>0;
- const value=live?quote.current_price:row.last_price;
- const label=live?"LIVE · "+(quote.quote_mode||"feed"):"LAST RANKING SNAPSHOT";
- const detail=live?quote.source+" · "+formatTime(quote.quote_time):"Ranking snapshot · "+formatTime(row.observed_at)+" · live feed not fresh";
+ const quote=quoteFor(row),hasRefreshed=Number(quote.current_price)>0,live=quote.live===true&&hasRefreshed;
+ const value=hasRefreshed?quote.current_price:row.last_price;
+ const venue=quote.feed||quote.quote_mode||"provider";
+ const label=live?"LIVE · "+venue:hasRefreshed?"LAST REFRESH · "+venue:"LAST RANKING SNAPSHOT";
+ const detail=hasRefreshed?quote.source+" · "+formatTime(quote.quote_time)+(live?"":" · quote may be stale")+" · "+formatTime(quote.refreshed_at):"Ranking snapshot · "+formatTime(row.observed_at)+" · no refreshed quote available";
  return priceCell(value,label,detail,live);
 }
 function safeUrl(value){try{const url=new URL(String(value||""));return url.protocol==="https:"||url.protocol==="http:"?url.href:"#";}catch{return "#";}}
@@ -69,7 +72,27 @@ function newsCell(row){
  const item=items[0],src=Array.isArray(item.sources)?item.sources:[],verified=src.length>1?src.length+" sources":src.length===1?escapeHtml(src[0].name):"source unlinked";
  return '<td class="news-cell"><a href="'+escapeHtml(safeUrl(item.url))+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(item.title)+'</a><small>'+escapeHtml(item.event?.event_type||"General")+' · '+escapeHtml(item.event?.headline_tone||"No clear keyword signal")+'</small><small>'+verified+' · '+formatTime(item.published_at)+'</small></td>';
 }
-function renderRows(){const rows=currentRows(state.kind);document.getElementById("board-title").textContent=state.kind==="stock"?"Equity signals":"Digital asset signals";if(!rows.length){body.innerHTML='<tr><td colspan="9" class="loading-row">No qualifying signals are available for this market date yet.</td></tr>';renderAllocation();return;}body.innerHTML=rows.map(row=>{const score=Math.max(0,Math.min(100,number(row.score))),change=number(row.change_pct),symbol=escapeHtml(row.symbol),changeClass=change<0?"table-change negative":"table-change",entry=entryReference(row),historyDays=Math.max(0,Number(row.history_days)||0),riskFlags=[];if(Math.abs(change)>=20)riskFlags.push('<span class="risk-label severe" title="Large single-session move; elevated reversal and volatility risk">HIGH DAILY MOVE</span>');if(historyDays<20)riskFlags.push('<span class="risk-label caution" title="Insufficient stored daily bars for robust historical context">'+(historyDays===0?"NO PRICE HISTORY":"SHORT HISTORY ("+historyDays+" bars)")+'</span>');return '<tr><td><div class="asset-id"><span class="rank-mini">'+String(row.rank).padStart(2,"0")+'</span><span class="coin-mark">'+escapeHtml(symbol.slice(0,3))+'</span><span class="asset-label"><strong>'+symbol+'</strong><span>'+escapeHtml(row.name)+'</span></span></div></td>'+priceCell(entry.price,entry.method,"Calculated reference; experimental and not backtested")+dayAverageCell(row)+currentPriceCell(row)+'<td class="table-history">'+historyCell(row)+'</td><td class="'+changeClass+'">'+(change>0?"+":"")+change.toFixed(2)+'%</td><td class="table-turnover">'+compactMoney(row.approx_usd_turnover)+'</td>'+newsCell(row)+'<td><div class="table-signal">'+miniGauge(score)+'<span class="signal-word">'+(score>=75?"STRONG":score>=50?"MID":"LOW")+'</span></div>'+riskFlags.join("")+'</td></tr>';}).join("");renderAllocation();}
+function renderRows(){
+ const rows=currentRows(state.kind),kindLabel=state.kind==="stock"?"equities":"crypto";
+ document.getElementById("board-title").textContent=state.kind==="stock"?"Equity signals":"Digital asset signals";
+ const minimum=Number(state.data?.eligibility?.minimum_prior_daily_bars)||20;
+ const subtitle=document.getElementById("board-subtitle"),universe=state.data?.universe_note||"Limited source universe; not every listed asset is covered.";
+ subtitle.textContent=rows.length+" qualified "+kindLabel+" · relative screen from configured feeds · minimum "+minimum+" prior daily bars · scores are not gain probabilities.";
+ subtitle.title=universe;
+ if(!rows.length){body.innerHTML='<tr><td colspan="9" class="loading-row">No qualifying candidates for this market date. The screen will not fill ten slots when history or liquidity is inadequate.</td></tr>';renderAllocation();return;}
+ body.innerHTML=rows.map(row=>{
+  const score=Math.max(0,Math.min(100,number(row.score))),change=quotedMove(row),symbol=escapeHtml(row.symbol),changeClass=change<0?"table-change negative":"table-change",entry=entryReference(row),historyDays=Math.max(0,Number(row.history_days)||0),risk=row.risk_metrics||{},riskFlags=[];
+  if(Math.abs(change)>=20)riskFlags.push('<span class="risk-label severe" title="Large single-session move; elevated reversal and volatility risk">HIGH DAILY MOVE</span>');
+  if(historyDays<minimum)riskFlags.push('<span class="risk-label caution" title="Insufficient stored daily bars for robust historical context">'+(historyDays===0?"NO PRICE HISTORY":"SHORT HISTORY ("+historyDays+" bars)")+'</span>');
+  if(Number(risk.max_drawdown_20d_pct)<=-20)riskFlags.push('<span class="risk-label caution" title="The asset fell at least 20% from a recent rolling high over the last 20 bars">DEEP 20D DRAWDOWN</span>');
+  const metrics=[];
+  if(risk.annualized_volatility_20d_pct!==null&&risk.annualized_volatility_20d_pct!==undefined&&Number.isFinite(Number(risk.annualized_volatility_20d_pct)))metrics.push("20d vol "+Number(risk.annualized_volatility_20d_pct).toFixed(0)+"% ann.");
+  if(risk.max_drawdown_20d_pct!==null&&risk.max_drawdown_20d_pct!==undefined&&Number.isFinite(Number(risk.max_drawdown_20d_pct)))metrics.push("20d DD "+Number(risk.max_drawdown_20d_pct).toFixed(1)+"%");
+  const riskDetail=metrics.length?'<small class="risk-context">'+metrics.join(" · ")+'</small>':'';
+  return '<tr><td><div class="asset-id"><span class="rank-mini">'+String(row.rank).padStart(2,"0")+'</span><span class="coin-mark">'+escapeHtml(symbol.slice(0,3))+'</span><span class="asset-label"><strong>'+symbol+'</strong><span>'+escapeHtml(row.name)+'</span></span></div></td>'+priceCell(entry.price,entry.method,"20-day moving-average reference; not an instruction to buy")+dayAverageCell(row)+currentPriceCell(row)+'<td class="table-history">'+historyCell(row)+'</td><td class="'+changeClass+'">'+(change>0?"+":"")+change.toFixed(2)+'%</td><td class="table-turnover">'+compactMoney(row.approx_usd_turnover)+'</td>'+newsCell(row)+'<td><div class="table-signal">'+miniGauge(score)+'<span class="signal-word">'+(score>=75?"HIGH RELATIVE":score>=50?"MID RELATIVE":"LOW RELATIVE")+'</span></div>'+riskDetail+riskFlags.join("")+'</td></tr>';
+ }).join("");
+ renderAllocation();
+}
 function renderForecast(){
  const forecast=state.data?.tomorrow_forecast;
  const list=document.getElementById("forecast-rows");
@@ -80,9 +103,9 @@ function renderForecast(){
  ["1d","5d","20d"].forEach(key=>{const metric=horizons[key]||{},label=key.toUpperCase(),mean=metric.average_return_pct,n=Number(metric.evaluated)||0,excess=metric.average_excess_pct;document.getElementById("forecast-"+key).textContent=mean!==null&&mean!==undefined&&Number.isFinite(Number(mean))?(Number(mean)>0?"+":"")+Number(mean).toFixed(2)+"%":"—";document.getElementById("forecast-"+key+"-detail").textContent=n+" scored · vs SPY/BTC "+(excess!==null&&excess!==undefined&&Number.isFinite(Number(excess))?((Number(excess)>0?"+":"")+Number(excess).toFixed(2)+"%"):"—");});
  document.querySelectorAll(".forecast-tab").forEach(tab=>{const active=tab.dataset.forecastKind===state.forecastKind;tab.classList.toggle("active",active);tab.setAttribute("aria-selected",String(active));});
  const rows=forecast?.[state.forecastKind==="stock"?"stocks":"crypto"]||[];
- if(!rows.length){list.innerHTML='<tr><td colspan="5" class="loading-row">No saved forecast is available yet. Refresh the dashboard to generate one from the latest collector snapshot.</td></tr>';document.getElementById("forecast-source").textContent="Forecast unavailable; today’s board remains separate.";return;}
+ if(!rows.length){const candidates=currentRows(state.forecastKind).length;list.innerHTML='<tr><td colspan="5" class="loading-row">'+(candidates?'No saved forecast is available yet. Refresh after the next collector run.':'No qualified candidates for this market today. The screen is withholding a forecast because coverage and history requirements were not met.')+'</td></tr>';document.getElementById("forecast-source").textContent=candidates?"Forecast unavailable; today’s research board remains separate.":"No forecast issued · minimum evidence threshold not met.";return;}
  list.innerHTML=rows.map(row=>{const returned=row.result_return_pct===null||row.result_return_pct===undefined?null:Number(row.result_return_pct),result=returned===null?'<span class="forecast-pending">Pending close</span>':'<span class="'+(returned>=0?"up":"down")+'">'+(returned>0?"+":"")+returned.toFixed(2)+'% · next close</span>';return '<tr><td><div class="asset-id"><span class="rank-mini">'+String(row.rank).padStart(2,"0")+'</span><span class="coin-mark">'+escapeHtml(String(row.symbol||"").slice(0,3))+'</span><span class="asset-label"><strong>'+escapeHtml(row.symbol)+'</strong><span>'+escapeHtml(row.name)+'</span></span></div></td><td class="table-turnover">'+money(row.snapshot_price)+'</td><td>'+miniGauge(number(row.score))+'</td>'+newsCell(row)+'<td>'+result+'</td></tr>';}).join("");
- document.getElementById("forecast-source").textContent="Saved "+formatTime(forecast.forecasted_at)+" · "+(forecast.method||"momentum-liquidity-v1")+" · "+rows.length+" qualifying candidate"+(rows.length===1?"":"s");
+ document.getElementById("forecast-source").textContent="Saved "+formatTime(forecast.forecasted_at)+" · "+(forecast.method||"risk-aware-screen-v2")+" · "+rows.length+" qualifying candidate"+(rows.length===1?"":"s");
 }
 function setForecastKind(kind){state.forecastKind=kind;renderForecast();}
 function renderMovement(){
@@ -121,7 +144,10 @@ async function refreshLiveQuotes(){
   renderRows();renderTopBoards();renderTicker();
   const liveStocks=stockSymbols.filter(symbol=>state.data.live_quotes[symbol]?.live).length;
   const liveCrypto=cryptoSymbols.filter(symbol=>state.data.live_quotes[symbol]?.live).length;
-  statusEl.innerHTML='<i class="live-dot"></i> Live now · '+liveCrypto+'/'+cryptoSymbols.length+' crypto · '+liveStocks+'/'+stockSymbols.length+' stocks';
+  const noEquityFeed=stockSymbols.length&&stockPayload.configured===false;
+  statusEl.innerHTML=noEquityFeed
+   ?'<i class="health-warning-dot"></i> Coinbase live quotes · no Alpaca equity key; saved stock prices shown'
+   :'<i class="live-dot"></i> Live now · '+liveCrypto+'/'+cryptoSymbols.length+' crypto · '+liveStocks+'/'+stockSymbols.length+' IEX stocks';
  }catch{
   state.data.live_quotes=state.data.live_quotes||{};
   statusEl.innerHTML='<i class="live-dot"></i> Using last refreshed prices where live quotes are unavailable';

@@ -14,8 +14,8 @@ module.exports = async function handler(req, res) {
   if (!symbols.length) return res.status(200).json({ quotes: {}, refreshed_at: new Date().toISOString() });
 
   const now = new Date();
-  const start = Math.floor(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()) / 1000);
   const end = Math.floor(now.getTime() / 1000);
+  const start = end - 86400;
   const refreshedAt = now.toISOString();
 
   const results = await Promise.all(symbols.map(async (symbol) => {
@@ -51,6 +51,7 @@ module.exports = async function handler(req, res) {
         return sum + typical * candle.volume;
       }, 0);
       const latestCandle = candles[candles.length - 1] || null;
+      const firstCandle = candles[0] || null;
       let currentPrice = latestCandle?.close ?? null;
       let quoteTime = latestCandle ? new Date(latestCandle.start * 1000).toISOString() : null;
       let quoteMode = "5-minute candle";
@@ -74,19 +75,28 @@ module.exports = async function handler(req, res) {
         }
       }
 
+      const full24hWindow = Boolean(firstCandle && firstCandle.start <= start + 600);
+      const changePct = full24hWindow && firstCandle.open > 0 && currentPrice > 0
+        ? ((currentPrice / firstCandle.open) - 1) * 100
+        : null;
+
       return [symbol, {
         current_price: currentPrice,
+        change_pct: changePct,
         day_average: volumeSum > 0 ? averageNumerator / volumeSum : null,
         quote_time: quoteTime,
         refreshed_at: refreshedAt,
-        source: "Coinbase public market data",
+        source: "Coinbase public market data · single venue",
         quote_mode: quoteMode,
         live,
         bars_today: candles.length,
+        average_method: "24-hour 5-minute OHLC typical-price VWAP estimate",
+        feed: "Coinbase USD market",
       }];
     } catch {
       return [symbol, {
         current_price: null,
+        change_pct: null,
         day_average: null,
         quote_time: null,
         refreshed_at: refreshedAt,
@@ -100,7 +110,7 @@ module.exports = async function handler(req, res) {
 
   return res.status(200).json({
     refreshed_at: refreshedAt,
-    average_method: "5-minute OHLC typical-price volume-weighted estimate",
+    average_method: "24-hour 5-minute OHLC typical-price volume-weighted estimate",
     quotes: Object.fromEntries(results),
   });
 };

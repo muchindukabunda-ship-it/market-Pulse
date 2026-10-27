@@ -58,16 +58,21 @@ module.exports = async function handler(req, res) {
       const age = tradeTime ? (now - tradeTime.getTime()) / 1000 : Infinity;
       const price = Number(trade.p);
       const dayAverage = Number(daily.vw);
+      const dayOpen = Number(daily.o);
+      const dayChange = Number.isFinite(price) && price > 0 && Number.isFinite(dayOpen) && dayOpen > 0
+        ? ((price / dayOpen) - 1) * 100
+        : null;
       quotes[symbol] = {
         current_price: Number.isFinite(price) && price > 0 ? price : null,
+        change_pct: dayChange,
         day_average: Number.isFinite(dayAverage) && dayAverage > 0 ? dayAverage : null,
         quote_time: tradeTime && Number.isFinite(tradeTime.getTime()) ? tradeTime.toISOString() : null,
         refreshed_at: refreshedAt,
-        source: "Alpaca IEX market data",
+        source: "Alpaca IEX market data · single exchange",
         quote_mode: "latest IEX trade",
         live: Number.isFinite(age) && age >= -30 && age <= 120,
         bars_today: Number(daily.n) || 0,
-        feed: "IEX",
+        feed: "IEX (single exchange)",
       };
     }
     return res.status(200).json({ quotes, refreshed_at: refreshedAt, configured: true, provider: "Alpaca IEX" });
