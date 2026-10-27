@@ -629,14 +629,38 @@ Deno.serve(async (req) => {
         outcomes.push({ source_key: source.source_key, status: "failed", error: message });
       }
     }
+    let forecastRefresh: Record<string, unknown> = { status: "not_attempted" };
+    try {
+      const rankingsUrl = new URL("/functions/v1/rankings", supabaseUrl).toString();
+      const forecastResponse = await request(rankingsUrl, {
+        headers: {
+          "x-market-pulse-secret": expectedSecret,
+          Accept: "application/json",
+        },
+      }, 25000);
+      if (forecastResponse.ok) {
+        const forecastPayload = await forecastResponse.json();
+        forecastRefresh = {
+          status: "succeeded",
+          stocks: forecastPayload.tomorrow_forecast?.stocks?.length ?? 0,
+          crypto: forecastPayload.tomorrow_forecast?.crypto?.length ?? 0,
+          stock_target_date: forecastPayload.tomorrow_forecast?.stock_target_date ?? null,
+          crypto_target_date: forecastPayload.tomorrow_forecast?.crypto_target_date ?? null,
+        };
+      } else {
+        forecastRefresh = { status: "failed", http_status: forecastResponse.status };
+      }
+    } catch {
+      forecastRefresh = { status: "failed", note: "ranking refresh unavailable; retry on next collector run" };
+    }
     const failed = outcomes.filter((o) => o.status === "failed").length;
     const attempted = outcomes.filter((o) => o.status !== "skipped").length;
     await db(`ingestion_runs?id=eq.${runId}`, { method: "PATCH", body: JSON.stringify({
       finished_at: new Date().toISOString(), status: failed === 0 ? "succeeded" : successCount ? "partial" : "failed",
       sources_attempted: attempted, sources_succeeded: successCount, article_count: articleCount,
-      price_count: priceCount, asset_count: assetsCount, error_count: failed, details: { outcomes },
+      price_count: priceCount, asset_count: assetsCount, error_count: failed, details: { outcomes, forecast_refresh: forecastRefresh },
     }) });
-    return response({ run_id: runId, status: failed === 0 ? "succeeded" : successCount ? "partial" : "failed", outcomes });
+    return response({ run_id: runId, status: failed === 0 ? "succeeded" : successCount ? "partial" : "failed", outcomes, forecast_refresh: forecastRefresh });
   } catch (error) {
     if (runId) {
       try { await db(`ingestion_runs?id=eq.${runId}`, { method: "PATCH", body: JSON.stringify({ finished_at: new Date().toISOString(), status: "failed", error_count: 1, details: { fatal_error: String(error).slice(0, 500) } }) }); } catch { /* preserve the initial failure */ }
