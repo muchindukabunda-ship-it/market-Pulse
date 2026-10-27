@@ -79,6 +79,12 @@
 <div class="allocation-warning"><span>ⓘ</span><p>Math-only scenario: equal split across the first five displayed signals (or all available if fewer). It does not account for your finances, risk tolerance, volatility, diversification, taxes, or suitability. Not a buy recommendation.</p></div>
 </aside>
 </section>
+<section class="panel forecast-panel" id="tomorrow-forecast">
+<div class="panel-heading forecast-heading"><div><div class="eyebrow small">NEXT-SESSION OUTLOOK</div><h2>Tomorrow’s forecast</h2><p class="panel-subtitle">Ranked candidates from the latest collector snapshot—not a price target or promise.</p></div><div class="forecast-date"><span>FORECAST SESSION</span><strong id="forecast-date">Building forecast…</strong></div></div>
+<div class="forecast-toolbar"><div class="market-switch" role="tablist" aria-label="Choose forecast market"><button class="forecast-tab active" type="button" data-forecast-kind="stock" role="tab" aria-selected="true">Equities</button><button class="forecast-tab" type="button" data-forecast-kind="crypto" role="tab" aria-selected="false">Crypto</button></div><div class="forecast-performance"><span><strong id="forecast-win-rate">—</strong><small>positive next-session returns</small></span><span><strong id="forecast-avg-return">—</strong><small>average next-session return</small></span><span><strong id="forecast-evaluated">0</strong><small>evaluated predictions</small></span></div></div>
+<div class="asset-table-wrap forecast-table-wrap"><table class="asset-table forecast-table"><thead><tr><th>FORECAST RANK / ASSET</th><th>SNAPSHOT PRICE</th><th>MODEL SCORE</th><th>NEXT-SESSION RESULT</th></tr></thead><tbody id="forecast-rows"><tr><td colspan="4" class="loading-row">Loading saved forecast…</td></tr></tbody></table></div>
+<div class="forecast-foot"><span id="forecast-source">Forecast generated from the latest stored ranking snapshot.</span><span>Performance starts after each forecast’s target session closes. Results are measured from the saved snapshot price and do not train or change the model automatically.</span></div>
+</section>
 <section class="method-row">
 <div class="method-badge">MODEL</div><div><strong>Momentum + liquidity · v1</strong><span>70% daily move ranking + 30% approximate turnover ranking. No backtest or news-sentiment weighting yet.</span></div><div class="method-refresh">DATA REFRESHES EVERY 3 HOURS</div>
 </section>
