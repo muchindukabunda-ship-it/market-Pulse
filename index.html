@@ -1,90 +1,90 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="robots" content="noindex,nofollow">
-  <meta name="description" content="Private Market Pulse market signals dashboard">
-  <title>Market Pulse</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230c1715'/%3E%3Cpath d='M10 35h12l7-17 9 29 7-16h9' fill='none' stroke='%2368e0b3' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/styles.css">
-  <script defer src="/app.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="description" content="Market Pulse personal market research dashboard">
+<title>Market Pulse — Intelligence Terminal</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='18' fill='%230b1214'/%3E%3Cpath d='M9 37h12l7-18 9 29 7-17h11' fill='none' stroke='%2377f0c0' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<script defer src="/app.js"></script>
 </head>
 <body>
-  <main class="shell">
-    <header class="topbar">
-      <a class="brand" href="/" aria-label="Market Pulse home">
-        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
-        <span>market<span class="brand-light">pulse</span></span>
-      </a>
-      <div class="top-actions">
-        <span class="private-tag"><span class="lock" aria-hidden="true">●</span> PRIVATE WORKSPACE</span>
-        <button id="refresh" class="icon-button" type="button" aria-label="Refresh rankings" title="Refresh rankings">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.8-3L3 11m0-5v5h5M4 13a8 8 0 0 0 14.8 3L21 13m0 5v-5h-5"/></svg>
-        </button>
-      </div>
-    </header>
-
-    <section class="hero">
-      <div class="eyebrow"><span class="pulse-dot"></span> MARKET SCAN <span class="eyebrow-divider">/</span> <span id="market-date">LOADING DATE</span></div>
-      <div class="hero-row">
-        <div>
-          <h1>Signals, not noise.</h1>
-          <p class="hero-copy">A data-led snapshot of the strongest market momentum in the latest scan.</p>
-        </div>
-        <div class="scan-card">
-          <span class="scan-label">LATEST RANKING</span>
-          <strong id="scan-time">Loading…</strong>
-          <span id="scan-status" class="scan-status"><span class="pulse-dot"></span> Connecting to your data</span>
-        </div>
-      </div>
-      <div class="metric-strip">
-        <div class="metric"><span>QUALIFIED STOCKS</span><strong id="stock-count">—</strong></div>
-        <div class="metric"><span>QUALIFIED COINS</span><strong id="crypto-count">—</strong></div>
-        <div class="metric"><span>RANKING MODEL</span><strong class="model-name">MOMENTUM + LIQUIDITY</strong></div>
-      </div>
-    </section>
-
-    <section class="panel">
-      <div class="panel-head">
-        <div>
-          <div class="eyebrow">TODAY’S BOARD</div>
-          <h2>Top market signals</h2>
-        </div>
-        <div class="tabs" role="tablist" aria-label="Asset type">
-          <button class="tab active" role="tab" aria-selected="true" data-kind="stock">Stocks <span id="stock-tab-count">—</span></button>
-          <button class="tab" role="tab" aria-selected="false" data-kind="crypto">Crypto <span id="crypto-tab-count">—</span></button>
-        </div>
-      </div>
-      <div id="error" class="error-box" hidden></div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>#</th><th>ASSET</th><th>LAST PRICE</th><th>24H / DAY MOVE</th><th>TURNOVER*</th><th>SIGNAL SCORE</th><th>NEWS LINKS</th></tr></thead>
-          <tbody id="rankings"><tr><td colspan="7" class="loading-row"><span class="loader"></span> Loading today’s signals…</td></tr></tbody>
-        </table>
-      </div>
-      <div class="table-foot">
-        <span>* Approximate traded dollar value based on the provider’s reported volume.</span>
-        <span>Prices are source snapshots, not live quotes.</span>
-      </div>
-    </section>
-
-    <section class="method-grid">
-      <article class="method-card">
-        <span class="method-icon">01</span>
-        <div><h3>How the score works</h3><p>Momentum contributes 70%; approximate dollar turnover contributes 30%. Scores rank today’s qualifying assets against each other.</p></div>
-      </article>
-      <article class="method-card caution">
-        <span class="method-icon">!</span>
-        <div><h3>Read this before acting</h3><p>This is an experimental research screen, not a buy recommendation. It has no historical backtest and does not include news sentiment. Strong one-day moves can reverse sharply.</p></div>
-      </article>
-    </section>
-
-    <footer>
-      <span>MARKET PULSE <span class="footer-sep">/</span> PERSONAL RESEARCH</span>
-      <span>Data refreshes every 3 hours; ranking refresh follows the scan.</span>
-    </footer>
-  </main>
-  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+<div class="app-shell">
+<aside class="sidebar">
+<a class="brand" href="/" aria-label="Market Pulse"><span class="brand-mark"><i></i><i></i><i></i></span><span>market<span>pulse</span></span></a>
+<div class="side-caption">WORKSPACE</div>
+<nav class="side-nav" aria-label="Dashboard sections">
+<a class="nav-link active" href="#overview"><span class="nav-icon">◈</span>Overview</a>
+<button class="nav-link" type="button" data-kind="stock"><span class="nav-icon">▥</span>Equities <span id="side-stock-count" class="nav-count">—</span></button>
+<button class="nav-link" type="button" data-kind="crypto"><span class="nav-icon">◉</span>Digital assets <span id="side-crypto-count" class="nav-count">—</span></button>
+<a class="nav-link" href="#allocation"><span class="nav-icon">◌</span>Allocation lab</a>
+</nav>
+<div class="sidebar-bottom">
+<div class="secure-card"><span class="secure-dot"></span><div><strong>Personal workspace</strong><span>Protected dashboard</span></div></div>
+<div class="side-foot">MARKET PULSE <span>v1.1</span></div>
+</div>
+</aside>
+<main class="main-content" id="overview">
+<header class="topbar">
+<div class="crumb"><span class="crumb-home">MP</span><span>/</span><span>Intelligence terminal</span></div>
+<div class="top-actions"><div class="live-chip"><span class="live-dot"></span><span>DATA SNAPSHOT</span></div><button id="refresh" class="refresh-btn" type="button"><span class="refresh-icon">↻</span><span>Refresh</span></button><div class="avatar">MP</div></div>
+</header>
+<section class="welcome-row">
+<div><div class="eyebrow"><span class="eyebrow-mark"></span> PERSONAL MARKET INTELLIGENCE <span class="eyebrow-sep">/</span><span id="market-date">LOADING</span></div><h1>See the signal.<br><span>Size the scenario.</span></h1><p class="welcome-copy">Momentum, liquidity, and daily market movement in one decision workspace.</p></div>
+<div class="scan-summary"><span class="summary-label">LATEST RANKING</span><strong id="scan-time">Loading…</strong><span id="scan-status" class="scan-status"><i class="live-dot"></i>Connecting to data</span></div>
+</section>
+<section class="metric-grid" aria-label="Market overview">
+<article class="metric-card"><div class="metric-top"><span>STOCK SIGNALS</span><span class="metric-icon">▥</span></div><div class="metric-value" id="stock-count">—</div><div class="metric-sub"><span class="metric-mark green"></span><span>qualifying today</span></div></article>
+<article class="metric-card"><div class="metric-top"><span>CRYPTO SIGNALS</span><span class="metric-icon">◉</span></div><div class="metric-value" id="crypto-count">—</div><div class="metric-sub"><span class="metric-mark green"></span><span>qualifying today</span></div></article>
+<article class="metric-card"><div class="metric-top"><span>AVG SIGNAL SCORE</span><span class="metric-icon">◌</span></div><div class="metric-value"><span id="avg-score">—</span><small>/100</small></div><div class="metric-sub"><span class="metric-mark aqua"></span><span>across current board</span></div></article>
+<article class="metric-card"><div class="metric-top"><span>BOARD TURNOVER</span><span class="metric-icon">$</span></div><div class="metric-value" id="board-turnover">—</div><div class="metric-sub"><span class="metric-mark aqua"></span><span>approx. traded value</span></div></article>
+</section>
+<section class="insights-grid">
+<article class="panel gauge-panel">
+<div class="panel-heading"><div><div class="eyebrow small">MODEL READOUT</div><h2>Signal temperature</h2></div><span class="panel-kicker">COMPOSITE SCORE</span></div>
+<div class="gauge-layout"><div class="gauge" id="main-gauge" role="img" aria-label="Average signal score"><svg viewBox="0 0 180 180" aria-hidden="true"><circle class="gauge-track" cx="90" cy="90" r="72"></circle><circle class="gauge-value" id="gauge-ring" cx="90" cy="90" r="72"></circle></svg><div class="gauge-center"><strong id="gauge-number">—</strong><span>OUT OF 100</span></div></div><div class="gauge-copy"><span class="gauge-status"><i class="live-dot"></i> TODAY’S BOARD</span><h3 id="gauge-label">Loading signals</h3><p id="gauge-description">Composite of the visible stock and crypto signal scores.</p><div class="gauge-legend"><span><i class="legend-dot green"></i> Momentum + liquidity</span><span><i class="legend-dot gray"></i> Relative score scale</span></div></div></div>
+<div class="gauge-scale"><span>LOWER SIGNAL</span><div class="scale-line"></div><span>HIGHER SIGNAL</span></div>
+</article>
+<article class="panel movement-panel">
+<div class="panel-heading"><div><div class="eyebrow small">DAILY SNAPSHOT</div><h2>Movement leaders</h2></div><div class="select-wrap"><select id="chart-kind" aria-label="Choose market for movement chart"><option value="stock">Stocks</option><option value="crypto">Crypto</option></select></div></div>
+<div class="chart-meta"><span>TOP MOVES · % CHANGE</span><span class="chart-live"><i class="live-dot"></i> source snapshot</span></div>
+<div id="move-chart" class="move-chart" aria-label="Daily movement bar chart"></div>
+<div class="chart-foot"><span>Sorted by today’s percentage move</span><span>Not a historical performance chart</span></div>
+</article>
+</section>
+<section class="workspace-grid">
+<article class="panel board-panel" id="markets">
+<div class="panel-heading board-heading"><div><div class="eyebrow small">RANKED OPPORTUNITY BOARD</div><h2 id="board-title">Equity signals</h2><p class="panel-subtitle">Ranked by the current momentum + liquidity model</p></div><div class="market-switch" role="tablist" aria-label="Select asset market"><button class="market-tab active" type="button" data-kind="stock" role="tab" aria-selected="true">Equities <span id="stock-tab-count">—</span></button><button class="market-tab" type="button" data-kind="crypto" role="tab" aria-selected="false">Crypto <span id="crypto-tab-count">—</span></button></div></div>
+<div id="error" class="error-box" hidden></div>
+<div class="asset-table-wrap"><table class="asset-table"><thead><tr><th>RANK / ASSET</th><th>LAST PRICE</th><th>DAY MOVE</th><th>TURNOVER*</th><th>SIGNAL</th></tr></thead><tbody id="rankings"><tr><td colspan="5" class="loading-row">Connecting to your market feed…</td></tr></tbody></table></div>
+<div class="board-foot"><span>* Provider-reported volume × price; approximate.</span><span id="board-method">Scores are relative, not probabilities.</span></div>
+</article>
+<aside class="panel allocation-panel" id="allocation">
+<div class="panel-heading"><div><div class="eyebrow small">WHAT-IF TOOL</div><h2>Allocation lab</h2></div><span class="lab-icon">◌</span></div>
+<p class="allocation-intro">Explore a hypothetical split across today’s top signals. You control the budget and exposure.</p>
+<label class="field-label" for="budget">Scenario portfolio value</label>
+<div class="money-input"><span>$</span><input id="budget" type="number" min="0" step="100" value="10000" inputmode="decimal" aria-label="Scenario portfolio value"></div>
+<div class="slider-head"><label class="field-label" for="exposure">Hypothetical amount to model</label><strong id="exposure-label">25%</strong></div>
+<input id="exposure" class="range-slider" type="range" min="0" max="100" step="5" value="25">
+<div class="range-labels"><span>0% cash-only</span><span>100% of scenario</span></div>
+<div class="allocation-summary"><div><span>MODEL AMOUNT</span><strong id="model-amount">$—</strong></div><div><span>REMAINS UNALLOCATED</span><strong id="reserve-amount">$—</strong></div></div>
+<div id="allocation-donut" class="allocation-donut" role="img" aria-label="Equal-weight hypothetical allocation"></div>
+<div class="allocation-legend"><span><i class="legend-dot green"></i> Equal split across displayed signals</span><span><i class="legend-dot gray"></i> Unallocated scenario balance</span></div>
+<div id="allocation-rows" class="allocation-rows"></div>
+<div class="allocation-warning"><span>ⓘ</span><p>Math-only scenario: equal split across the first five displayed signals (or all available if fewer). It does not account for your finances, risk tolerance, volatility, diversification, taxes, or suitability. Not a buy recommendation.</p></div>
+</aside>
+</section>
+<section class="method-row">
+<div class="method-badge">MODEL</div><div><strong>Momentum + liquidity · v1</strong><span>70% daily move ranking + 30% approximate turnover ranking. No backtest or news-sentiment weighting yet.</span></div><div class="method-refresh">DATA REFRESHES EVERY 3 HOURS</div>
+</section>
+<footer><span>MARKET PULSE <i>/</i> PERSONAL RESEARCH WORKSPACE</span><span>Prices are snapshots, not live quotes. Verify data independently before making decisions.</span></footer>
+</main>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 </body>
 </html>
