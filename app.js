@@ -51,13 +51,14 @@ function priceCell(price,label,title="",live=false){
 function dayAverageCell(row){
  const quote=quoteFor(row),avg=Number(quote.day_average);
  if(!Number.isFinite(avg)||avg<=0)return '<td class="table-pricepair" title="No intraday average is available for this asset."><strong>—</strong><small class="price-stale">not available</small></td>';
- return priceCell(avg,"5m VWAP est.",quote.source+" · "+(quote.bars_today||0)+" bars today");
+ const method=String(quote.source||"").includes("Alpaca IEX")?"IEX session VWAP":"5m VWAP estimate";return priceCell(avg,method,quote.source+" · "+(quote.bars_today||0)+" bars today");
 }
 function currentPriceCell(row){
  const quote=quoteFor(row),live=quote.live===true&&Number(quote.current_price)>0;
  const value=live?quote.current_price:row.last_price;
- const label=live?"LIVE · "+(quote.quote_mode||"feed"):"LAST REFRESHED";
- return priceCell(value,label,(quote.source||"ranking snapshot")+" · "+formatTime(quote.quote_time||quote.refreshed_at||row.observed_at),live);
+ const label=live?"LIVE · "+(quote.quote_mode||"feed"):"LAST RANKING SNAPSHOT";
+ const detail=live?quote.source+" · "+formatTime(quote.quote_time):"Ranking snapshot · "+formatTime(row.observed_at)+" · live feed not fresh";
+ return priceCell(value,label,detail,live);
 }
 function safeUrl(value){try{const url=new URL(String(value||""));return url.protocol==="https:"||url.protocol==="http:"?url.href:"#";}catch{return "#";}}
 function newsCell(row){
@@ -77,8 +78,8 @@ function renderForecast(){
  ["1d","5d","20d"].forEach(key=>{const metric=horizons[key]||{},label=key.toUpperCase(),mean=metric.average_return_pct,n=Number(metric.evaluated)||0,excess=metric.average_excess_pct;document.getElementById("forecast-"+key).textContent=mean!==null&&mean!==undefined&&Number.isFinite(Number(mean))?(Number(mean)>0?"+":"")+Number(mean).toFixed(2)+"%":"—";document.getElementById("forecast-"+key+"-detail").textContent=n+" scored · vs SPY/BTC "+(excess!==null&&excess!==undefined&&Number.isFinite(Number(excess))?((Number(excess)>0?"+":"")+Number(excess).toFixed(2)+"%"):"—");});
  document.querySelectorAll(".forecast-tab").forEach(tab=>{const active=tab.dataset.forecastKind===state.forecastKind;tab.classList.toggle("active",active);tab.setAttribute("aria-selected",String(active));});
  const rows=forecast?.[state.forecastKind==="stock"?"stocks":"crypto"]||[];
- if(!rows.length){list.innerHTML='<tr><td colspan="4" class="loading-row">No saved forecast is available yet. Refresh the dashboard to generate one from the latest collector snapshot.</td></tr>';document.getElementById("forecast-source").textContent="Forecast unavailable; today’s board remains separate.";return;}
- list.innerHTML=rows.map(row=>{const returned=row.result_return_pct===null||row.result_return_pct===undefined?null:Number(row.result_return_pct),result=returned===null?'<span class="forecast-pending">Pending close</span>':'<span class="'+(returned>=0?"up":"down")+'">'+(returned>0?"+":"")+returned.toFixed(2)+'% · next close</span>';return '<tr><td><div class="asset-id"><span class="rank-mini">'+String(row.rank).padStart(2,"0")+'</span><span class="coin-mark">'+escapeHtml(String(row.symbol||"").slice(0,3))+'</span><span class="asset-label"><strong>'+escapeHtml(row.symbol)+'</strong><span>'+escapeHtml(row.name)+'</span></span></div></td><td class="table-turnover">'+money(row.snapshot_price)+'</td><td>'+miniGauge(number(row.score))+'</td><td>'+result+'</td></tr>';}).join("");
+ if(!rows.length){list.innerHTML='<tr><td colspan="5" class="loading-row">No saved forecast is available yet. Refresh the dashboard to generate one from the latest collector snapshot.</td></tr>';document.getElementById("forecast-source").textContent="Forecast unavailable; today’s board remains separate.";return;}
+ list.innerHTML=rows.map(row=>{const returned=row.result_return_pct===null||row.result_return_pct===undefined?null:Number(row.result_return_pct),result=returned===null?'<span class="forecast-pending">Pending close</span>':'<span class="'+(returned>=0?"up":"down")+'">'+(returned>0?"+":"")+returned.toFixed(2)+'% · next close</span>';return '<tr><td><div class="asset-id"><span class="rank-mini">'+String(row.rank).padStart(2,"0")+'</span><span class="coin-mark">'+escapeHtml(String(row.symbol||"").slice(0,3))+'</span><span class="asset-label"><strong>'+escapeHtml(row.symbol)+'</strong><span>'+escapeHtml(row.name)+'</span></span></div></td><td class="table-turnover">'+money(row.snapshot_price)+'</td><td>'+miniGauge(number(row.score))+'</td>'+newsCell(row)+'<td>'+result+'</td></tr>';}).join("");
  document.getElementById("forecast-source").textContent="Saved "+formatTime(forecast.forecasted_at)+" · "+(forecast.method||"momentum-liquidity-v1")+" · "+rows.length+" qualifying candidate"+(rows.length===1?"":"s");
 }
 function setForecastKind(kind){state.forecastKind=kind;renderForecast();}
