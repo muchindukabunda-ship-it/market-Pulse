@@ -1,0 +1,9 @@
+{
+  "name": "market-pulse",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Personal Market Pulse research dashboard",
+  "scripts": {
+    "dev": "vercel dev"
+  }
+}
