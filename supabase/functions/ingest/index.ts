@@ -207,7 +207,7 @@ async function insertArticles(source: Source, items: ReturnType<typeof parseFeed
   }
   const uniqueLinks = [...new Map(links.map((link) => [`${link.article_id}:${link.source_id}`, link])).values()];
   await upsert("article_sources", uniqueLinks, "article_id,source_id");
-  const ambiguous = new Set(["CEO", "CFO", "IPO", "SEC", "USA", "USD", "THE", "ALL", "FOR", "ARE", "HAS", "NEW", "CAN", "YOU", "NOW", "TOP", "BIG", "AI", "IT", "ON", "IN"]);
+  const ambiguous = new Set(["CEO", "CFO", "IPO", "SEC", "USA", "USD", "THE", "ALL", "FOR", "ARE", "HAS", "NEW", "CAN", "YOU", "NOW", "TOP", "BIG", "AI", "IT", "ON", "IN", "FUND", "CARE", "OCC", "III", "CAT", "DAY", "ONE", "LOW", "HIGH", "YES", "NOW"]);
   const cryptoAliases: Record<string, string> = {
     bitcoin: "BTC", ether: "ETH", ethereum: "ETH", solana: "SOL", dogecoin: "DOGE", xrp: "XRP", ripple: "XRP",
     cardano: "ADA", litecoin: "LTC", avalanche: "AVAX", chainlink: "LINK", "binance coin": "BNB",
@@ -236,7 +236,10 @@ async function insertArticles(source: Source, items: ReturnType<typeof parseFeed
     for (const symbol of uppercaseTokens) {
       if (ambiguous.has(symbol)) continue;
       const asset = assetBySymbol.get(`stock:${symbol}`);
-      if (asset) mentions.push({ article_id, asset_id: asset.id, match_type: "ticker_token", confidence: 0.72, matched_text: symbol });
+      if (!asset) continue;
+      const escaped = escapeRegex(symbol);
+      const explicitTicker = new RegExp(`(?:\\$\\s*${escaped}\\b|\\b${escaped}\\s+(?:shares|stock|price|ticker)\\b|\\b(?:shares|stock|ticker|price)\\s+(?:of|for|in)?\\s*${escaped}\\b|\\b(?:nasdaq|nyse)\\s*:?[\\s]*${escaped}\\b)`, "i");
+      if (explicitTicker.test(body)) mentions.push({ article_id, asset_id: asset.id, match_type: "ticker_context", confidence: 0.92, matched_text: symbol });
     }
     const lower = body.toLowerCase();
     for (const [alias, symbol] of Object.entries(cryptoAliases)) {
