@@ -14,6 +14,17 @@ function currentRows(kind){return kind==="stock"?(state.data?.stocks||[]):(state
 function averageScore(rows){return rows.length?rows.reduce((a,r)=>a+number(r.score),0)/rows.length:0;}
 function gaugeLabel(score){if(score>=75)return "High relative signal";if(score>=50)return "Moderate relative signal";if(score>0)return "Lower relative signal";return "No signal data";}
 function setGauge(score){const clipped=Math.max(0,Math.min(100,score));document.getElementById("gauge-number").textContent=clipped.toFixed(0);document.getElementById("gauge-ring").style.strokeDashoffset=String(452.4*(1-clipped/100));document.getElementById("gauge-label").textContent=gaugeLabel(clipped);document.getElementById("gauge-description").textContent="Average score across "+(state.data?.stocks?.length||0)+" stocks and "+(state.data?.crypto?.length||0)+" coins in today’s board. A relative model score—not odds of a gain.";}
+function renderDataHealth(){
+ const health=state.data?.data_health||{},sources=state.data?.source_health||[];
+ const total=Number(health.sources)||sources.length,fresh=Number(health.fresh_sources)||0,history=Number(health.assets_with_history)||0,candidates=Number(health.candidate_assets)||0,articles=Number(health.linked_articles)||0;
+ document.getElementById("health-fresh").textContent=fresh+" / "+total;
+ document.getElementById("health-history").textContent=history+" / "+candidates;
+ document.getElementById("health-news").textContent=String(articles);
+ const status=document.getElementById("health-status");
+ status.innerHTML=total&&fresh===total?'<i class="live-dot"></i> All tracked feeds fresh':total?'<i class="health-warning-dot"></i> '+(total-fresh)+' feed(s) need review':'Feed health unavailable';
+ const list=document.getElementById("source-health-list");
+ list.innerHTML=sources.map(source=>'<div class="source-health-row"><span class="source-health-dot '+(source.stale?"stale":"fresh")+'"></span><strong>'+escapeHtml(source.name)+'</strong><span>'+escapeHtml(source.access||source.kind)+'</span><time>'+escapeHtml(formatTime(source.last_successful_at))+'</time><em>'+(source.stale?"STALE":"FRESH")+'</em></div>').join("")||'<span class="allocation-empty">Source status unavailable.</span>';
+}
 function renderSummary(){const stocks=state.data?.stocks||[],coins=state.data?.crypto||[],all=[...stocks,...coins];document.getElementById("stock-count").textContent=String(stocks.length).padStart(2,"0");document.getElementById("crypto-count").textContent=String(coins.length).padStart(2,"0");document.getElementById("side-stock-count").textContent=stocks.length;document.getElementById("side-crypto-count").textContent=coins.length;document.getElementById("stock-tab-count").textContent=stocks.length;document.getElementById("crypto-tab-count").textContent=coins.length;document.getElementById("avg-score").textContent=all.length?averageScore(all).toFixed(0):"—";document.getElementById("board-turnover").textContent=compactMoney(all.reduce((sum,r)=>sum+number(r.approx_usd_turnover),0));document.getElementById("market-date").textContent=formatDate(state.data?.market_date);document.getElementById("scan-time").textContent=formatTime(state.data?.generated_at);setGauge(averageScore(all));statusEl.innerHTML='<i class="live-dot"></i> Scan ready';}
 function miniGauge(score){const s=Math.max(0,Math.min(100,score)),circ=56.55;return '<div class="mini-gauge" role="img" aria-label="Signal score '+s.toFixed(0)+' out of 100"><svg viewBox="0 0 24 24" aria-hidden="true"><circle class="track" cx="12" cy="12" r="9"></circle><circle class="value" cx="12" cy="12" r="9" stroke-dasharray="'+circ+'" stroke-dashoffset="'+(circ*(1-s/100))+'"></circle></svg><span>'+s.toFixed(0)+'</span></div>';}
 function historyCell(row){
@@ -48,16 +59,22 @@ function currentPriceCell(row){
  const label=live?"LIVE · "+(quote.quote_mode||"feed"):"LAST REFRESHED";
  return priceCell(value,label,(quote.source||"ranking snapshot")+" · "+formatTime(quote.quote_time||quote.refreshed_at||row.observed_at),live);
 }
-function renderRows(){const rows=currentRows(state.kind);document.getElementById("board-title").textContent=state.kind==="stock"?"Equity signals":"Digital asset signals";if(!rows.length){body.innerHTML='<tr><td colspan="8" class="loading-row">No qualifying signals are available for this market date yet.</td></tr>';renderAllocation();return;}body.innerHTML=rows.map(row=>{const score=Math.max(0,Math.min(100,number(row.score))),change=number(row.change_pct),symbol=escapeHtml(row.symbol),changeClass=change<0?"table-change negative":"table-change",entry=entryReference(row);return '<tr><td><div class="asset-id"><span class="rank-mini">'+String(row.rank).padStart(2,"0")+'</span><span class="coin-mark">'+escapeHtml(symbol.slice(0,3))+'</span><span class="asset-label"><strong>'+symbol+'</strong><span>'+escapeHtml(row.name)+'</span></span></div></td>'+priceCell(entry.price,entry.method,"Calculated reference; experimental and not backtested")+dayAverageCell(row)+currentPriceCell(row)+'<td class="table-history">'+historyCell(row)+'</td><td class="'+changeClass+'">'+(change>0?"+":"")+change.toFixed(2)+'%</td><td class="table-turnover">'+compactMoney(row.approx_usd_turnover)+'</td><td><div class="table-signal">'+miniGauge(score)+'<span class="signal-word">'+(score>=75?"STRONG":score>=50?"MID":"LOW")+'</span></div></td></tr>';}).join("");renderAllocation();}
+function safeUrl(value){try{const url=new URL(String(value||""));return url.protocol==="https:"||url.protocol==="http:"?url.href:"#";}catch{return "#";}}
+function newsCell(row){
+ const items=Array.isArray(row.news_context)?row.news_context:[];
+ if(!items.length)return '<td class="news-cell empty">No verified linked coverage</td>';
+ const item=items[0],src=Array.isArray(item.sources)?item.sources:[],verified=src.length>1?src.length+" sources":src.length===1?escapeHtml(src[0].name):"source unlinked";
+ return '<td class="news-cell"><a href="'+escapeHtml(safeUrl(item.url))+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(item.title)+'</a><small>'+escapeHtml(item.event?.event_type||"General")+' · '+escapeHtml(item.event?.headline_tone||"No clear keyword signal")+'</small><small>'+verified+' · '+formatTime(item.published_at)+'</small></td>';
+}
+function renderRows(){const rows=currentRows(state.kind);document.getElementById("board-title").textContent=state.kind==="stock"?"Equity signals":"Digital asset signals";if(!rows.length){body.innerHTML='<tr><td colspan="9" class="loading-row">No qualifying signals are available for this market date yet.</td></tr>';renderAllocation();return;}body.innerHTML=rows.map(row=>{const score=Math.max(0,Math.min(100,number(row.score))),change=number(row.change_pct),symbol=escapeHtml(row.symbol),changeClass=change<0?"table-change negative":"table-change",entry=entryReference(row);return '<tr><td><div class="asset-id"><span class="rank-mini">'+String(row.rank).padStart(2,"0")+'</span><span class="coin-mark">'+escapeHtml(symbol.slice(0,3))+'</span><span class="asset-label"><strong>'+symbol+'</strong><span>'+escapeHtml(row.name)+'</span></span></div></td>'+priceCell(entry.price,entry.method,"Calculated reference; experimental and not backtested")+dayAverageCell(row)+currentPriceCell(row)+'<td class="table-history">'+historyCell(row)+'</td><td class="'+changeClass+'">'+(change>0?"+":"")+change.toFixed(2)+'%</td><td class="table-turnover">'+compactMoney(row.approx_usd_turnover)+'</td>'+newsCell(row)+'<td><div class="table-signal">'+miniGauge(score)+'<span class="signal-word">'+(score>=75?"STRONG":score>=50?"MID":"LOW")+'</span></div></td></tr>';}).join("");renderAllocation();}
 function renderForecast(){
  const forecast=state.data?.tomorrow_forecast;
  const list=document.getElementById("forecast-rows");
  const date=state.forecastKind==="stock"?forecast?.stock_target_date:forecast?.crypto_target_date;
  document.getElementById("forecast-date").textContent=date?formatDate(date):"Awaiting forecast";
  const record=forecast?.track_record?.[state.forecastKind]||{};
- document.getElementById("forecast-win-rate").textContent=record.positive_return_pct!==null&&record.positive_return_pct!==undefined&&Number.isFinite(Number(record.positive_return_pct))?Number(record.positive_return_pct).toFixed(0)+"%":"—";
- document.getElementById("forecast-avg-return").textContent=record.average_return_pct!==null&&record.average_return_pct!==undefined&&Number.isFinite(Number(record.average_return_pct))?(Number(record.average_return_pct)>0?"+":"")+Number(record.average_return_pct).toFixed(2)+"%":"—";
- document.getElementById("forecast-evaluated").textContent=String(record.evaluated||0);
+ const horizons=record.horizons||{};
+ ["1d","5d","20d"].forEach(key=>{const metric=horizons[key]||{},label=key.toUpperCase(),mean=metric.average_return_pct,n=Number(metric.evaluated)||0,excess=metric.average_excess_pct;document.getElementById("forecast-"+key).textContent=mean!==null&&mean!==undefined&&Number.isFinite(Number(mean))?(Number(mean)>0?"+":"")+Number(mean).toFixed(2)+"%":"—";document.getElementById("forecast-"+key+"-detail").textContent=n+" scored · vs SPY/BTC "+(excess!==null&&excess!==undefined&&Number.isFinite(Number(excess))?((Number(excess)>0?"+":"")+Number(excess).toFixed(2)+"%"):"—");});
  document.querySelectorAll(".forecast-tab").forEach(tab=>{const active=tab.dataset.forecastKind===state.forecastKind;tab.classList.toggle("active",active);tab.setAttribute("aria-selected",String(active));});
  const rows=forecast?.[state.forecastKind==="stock"?"stocks":"crypto"]||[];
  if(!rows.length){list.innerHTML='<tr><td colspan="4" class="loading-row">No saved forecast is available yet. Refresh the dashboard to generate one from the latest collector snapshot.</td></tr>';document.getElementById("forecast-source").textContent="Forecast unavailable; today’s board remains separate.";return;}
@@ -67,22 +84,27 @@ function renderForecast(){
 function setForecastKind(kind){state.forecastKind=kind;renderForecast();}
 function renderMovement(){const rows=[...currentRows(state.chartKind)].sort((a,b)=>number(b.change_pct)-number(a.change_pct)).slice(0,5);const chart=document.getElementById("move-chart");if(!rows.length){chart.innerHTML='<div class="allocation-empty">No movement snapshot available.</div>';return;}const max=Math.max(1,...rows.map(r=>Math.abs(number(r.change_pct))));chart.innerHTML=rows.map(r=>{const v=number(r.change_pct),width=Math.max(2,Math.abs(v)/max*46),neg=v<0;return '<div class="move-row"><span class="move-symbol">'+escapeHtml(r.symbol)+'</span><div class="move-track"><span class="move-bar '+(neg?"negative":"")+'" style="width:'+width+'%"></span></div><span class="move-value '+(neg?"negative":"")+'">'+(v>0?"+":"")+v.toFixed(2)+'%</span></div>';}).join("");}
 function renderAllocation(){const budget=Math.max(0,number(document.getElementById("budget").value)),exposure=number(document.getElementById("exposure").value),rows=currentRows(state.kind).slice(0,5),model=budget*exposure/100,reserve=budget-model,each=rows.length?model/rows.length:0;document.getElementById("exposure-label").textContent=exposure.toFixed(0)+"%";document.getElementById("model-amount").textContent=money(model);document.getElementById("reserve-amount").textContent=money(reserve);const chart=document.getElementById("allocation-donut");const used=rows.length?exposure:0;const hue=rows.map((r,i)=>colors[i%colors.length]+" "+(i*used/rows.length)+"% "+((i+1)*used/rows.length)+"%");if(used<100)hue.push("#344447 "+used+"% 100%");chart.style.background="conic-gradient("+ (hue.length?hue.join(","):"#344447 0% 100%")+ ")";chart.innerHTML='<span>'+(rows.length?rows.length+" assets":"—")+'<small>EQUAL SPLIT</small></span>';const out=document.getElementById("allocation-rows");if(!rows.length){out.innerHTML='<div class="allocation-empty">Load a market board to model a split.</div>';return;}out.innerHTML=rows.map((r,i)=>'<div class="allocation-row"><div class="allocation-asset"><i class="allocation-color" style="background:'+colors[i%colors.length]+'"></i><div>'+escapeHtml(r.symbol)+'<small>Rank '+String(r.rank).padStart(2,"0")+' · score '+number(r.score).toFixed(0)+'</small></div></div><div class="allocation-amount">'+money(each)+'<small>'+(exposure/rows.length).toFixed(1)+'% of scenario</small></div></div>').join("");}
-function applyData(data){state.data=data;errorBox.hidden=true;renderSummary();renderRows();renderMovement();renderForecast();}
+function applyData(data){state.data=data;errorBox.hidden=true;renderSummary();renderRows();renderMovement();renderForecast();renderDataHealth();}
 async function refreshLiveQuotes(){
  if(!state.data)return;
- const symbols=(state.data.crypto||[]).map(row=>row.symbol).filter(Boolean).slice(0,10);
- if(!symbols.length)return;
+ const cryptoSymbols=(state.data.crypto||[]).map(row=>row.symbol).filter(Boolean).slice(0,10);
+ const stockSymbols=(state.data.stocks||[]).map(row=>row.symbol).filter(Boolean).slice(0,10);
  try{
-  const response=await fetch("/api/live-prices?symbols="+encodeURIComponent(symbols.join(",")),{method:"GET",cache:"no-store",headers:{"Accept":"application/json"}});
-  if(!response.ok)throw new Error("live price feed unavailable");
-  const payload=await response.json();
-  state.data.live_quotes=payload.quotes||{};
-  state.data.live_refreshed_at=payload.refreshed_at||new Date().toISOString();
+  const [cryptoResponse,stockResponse]=await Promise.all([
+   cryptoSymbols.length?fetch("/api/live-prices?symbols="+encodeURIComponent(cryptoSymbols.join(",")),{method:"GET",cache:"no-store",headers:{"Accept":"application/json"}}):Promise.resolve(null),
+   stockSymbols.length?fetch("/api/stock-prices?symbols="+encodeURIComponent(stockSymbols.join(",")),{method:"GET",cache:"no-store",headers:{"Accept":"application/json"}}):Promise.resolve(null)
+  ]);
+  const cryptoPayload=cryptoResponse&&cryptoResponse.ok?await cryptoResponse.json():{quotes:{}};
+  const stockPayload=stockResponse&&stockResponse.ok?await stockResponse.json():{quotes:{}};
+  state.data.live_quotes={...(cryptoPayload.quotes||{}),...(stockPayload.quotes||{})};
+  state.data.live_refreshed_at=new Date().toISOString();
   renderRows();
-  statusEl.innerHTML='<i class="live-dot"></i> Quotes updated '+escapeHtml(formatTime(state.data.live_refreshed_at));
+  const liveStocks=stockSymbols.filter(symbol=>state.data.live_quotes[symbol]?.live).length;
+  const liveCrypto=cryptoSymbols.filter(symbol=>state.data.live_quotes[symbol]?.live).length;
+  statusEl.innerHTML='<i class="live-dot"></i> Live now · '+liveCrypto+'/'+cryptoSymbols.length+' crypto · '+liveStocks+'/'+stockSymbols.length+' stocks';
  }catch{
   state.data.live_quotes=state.data.live_quotes||{};
-  statusEl.innerHTML='<i class="live-dot"></i> Using last refreshed prices';
+  statusEl.innerHTML='<i class="live-dot"></i> Using last refreshed prices where live quotes are unavailable';
  }
 }
 async function loadData(showToast=false){refreshButton.disabled=true;statusEl.innerHTML='<span class="live-dot"></span> Refreshing feed';try{const response=await fetch("/api/rankings",{method:"GET",cache:"no-store",headers:{"Accept":"application/json"}});if(!response.ok)throw new Error("Dashboard data could not be loaded ("+response.status+").");applyData(await response.json());await refreshLiveQuotes();if(showToast){const toast=document.getElementById("toast");toast.textContent="Market board and available live prices refreshed.";toast.classList.add("show");setTimeout(()=>toast.classList.remove("show"),2200);}}catch(error){errorBox.textContent=error.message||"Connection failed. Try refreshing.";errorBox.hidden=false;statusEl.textContent="Feed needs attention";if(!state.data)body.innerHTML='<tr><td colspan="8" class="loading-row">Could not reach Market Pulse. Check the protected data endpoint and try again.</td></tr>';}finally{refreshButton.disabled=false;}}
@@ -95,4 +117,4 @@ document.getElementById("chart-kind").addEventListener("change",event=>{state.ch
 document.getElementById("budget").addEventListener("input",renderAllocation);
 document.getElementById("exposure").addEventListener("input",event=>{const v=number(event.target.value);event.target.style.background="linear-gradient(90deg,#66e4b1 "+v+"%,#314447 "+v+"%)";renderAllocation();});
 refreshButton.addEventListener("click",()=>loadData(true));
-loadData();setInterval(()=>refreshLiveQuotes(),60000);
+loadData();setInterval(()=>refreshLiveQuotes(),60000);setInterval(()=>loadData(false),3*60*60*1000);
