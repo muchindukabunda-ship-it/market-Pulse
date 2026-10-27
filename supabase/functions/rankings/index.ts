@@ -57,7 +57,7 @@ async function predictionsFor(rows: Array<Record<string, any>>, marketDate: stri
         const pricesUrl = new URL("/rest/v1/daily_prices", supabaseUrl);
         pricesUrl.searchParams.set("asset_id", "in.(" + ids.join(",") + ")");
         pricesUrl.searchParams.set("market_date", "gte." + fromDate);
-        pricesUrl.searchParams.set("interval", "in.(alpha_daily_100,coinbase_1d_350,kraken_1d_720)");
+        pricesUrl.searchParams.set("interval", "in.(alpha_daily_100,coinbase_1d_350,eod_mover_snapshot,kraken_1d_720)");
         pricesUrl.searchParams.set("select", "asset_id,market_date,close,interval");
         pricesUrl.searchParams.set("order", "asset_id.asc,market_date.asc,interval.asc");
         pricesUrl.searchParams.set("limit", "1000");
